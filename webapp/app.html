@@ -174,8 +174,7 @@
             <select id="addEntryGameId"><option value="">— оберіть гру —</option></select>
           </div>
           <div class="form-row">
-            <input type="number" id="addEntryUserId" placeholder="Залиште порожнім — додасться вам (адміну)" />
-            <p class="hint">Щоб додати іншого гравця — він має написати боту /start; потім ви можете додати його за цим полем (ID). Або просто додайте себе і надішліть посилання на бота.</p>
+            <input type="number" id="addEntryUserId" placeholder="Telegram ID (порожньо = додасться вам)" />
           </div>
           <button type="button" id="btnAddEntry" class="btn btn-secondary">Додати запис</button>
         </div>
@@ -183,10 +182,31 @@
     </div>
 
     <div id="user" class="user-only">
+      <section class="section" id="joinSection">
+        <h2 class="section-title">🎯 Приєднатися до гри</h2>
+        <div class="card" id="joinCard">
+          <div class="form-row">
+            <label class="field-label">Гра</label>
+            <select id="joinGameId"><option value="">— оберіть гру —</option></select>
+          </div>
+          <div class="form-row">
+            <label class="field-label">Сума ставки (грн)</label>
+            <select id="joinStake">
+              <option value="">— без ставки —</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
+          <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
+        </div>
+      </section>
       <section class="section">
         <h2 class="section-title">📋 Мої записи</h2>
         <div id="entriesList"></div>
-        <p class="hint">Якщо записів немає — адмін додасть вас у гру. Напишіть боту /start і з’явиться кнопка для відкриття додатку.</p>
+        <p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>
       </section>
     </div>
   </div>
@@ -222,8 +242,17 @@
       document.getElementById('btnAddMatches').onclick = addMatches;
       document.getElementById('btnAddEntry').onclick = addEntry;
     } else {
-      renderEntriesList(me.entries || []);
+      fillJoinGameSelect(me.games || []);
+      document.getElementById('btnJoin').onclick = joinGame;
+      renderEntriesList(me.entries || [], me.games || []);
     }
+  }
+
+  function fillJoinGameSelect(games) {
+    const sel = document.getElementById('joinGameId');
+    if (!sel) return;
+    const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
+    sel.innerHTML = '<option value="">— оберіть гру —</option>' + opts;
   }
 
   function escapeHtml(s) {
@@ -258,11 +287,11 @@
     fillGamesSelects(games);
   }
 
-  function renderEntriesList(entries) {
+  function renderEntriesList(entries, games) {
     const webAppUrl = baseUrl + '/select_teams';
     const el = document.getElementById('entriesList');
     if (!entries.length) {
-      el.innerHTML = '<p class="hint">У вас ще немає записів. Адмін додасть вас у гру.</p>';
+      el.innerHTML = '<p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>';
       return;
     }
     el.innerHTML = entries.map(e => {
@@ -271,12 +300,36 @@
       const cardClass = 'entry-card' + (canPick ? '' : ' disabled');
       const ctaText = canPick ? 'Обрати команди' : 'Чекайте результатів';
       const ctaIcon = canPick ? '⚽' : '⏳';
+      const stakeStr = e.stake != null ? ' · ' + e.stake + ' грн' : '';
       return '<a href="' + link + '" class="' + cardClass + '">' +
         '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
-        '<div class="meta">Раунд ' + e.current_round + ' з ' + e.rounds_total + '</div>' +
+        '<div class="meta">Раунд ' + e.current_round + ' з ' + e.rounds_total + stakeStr + '</div>' +
         '<span class="cta">' + ctaIcon + ' ' + ctaText + '</span>' +
       '</a>';
     }).join('');
+  }
+
+  async function joinGame() {
+    const gameId = document.getElementById('joinGameId').value;
+    const stakeEl = document.getElementById('joinStake');
+    const stakeVal = stakeEl && stakeEl.value ? parseInt(stakeEl.value, 10) : null;
+    if (!gameId) {
+      if (tg) tg.showAlert('Оберіть гру');
+      return;
+    }
+    try {
+      const r = await fetch(baseUrl + '/api/join_game?' + qs(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ game_id: parseInt(gameId, 10), stake: stakeVal })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || 'Помилка');
+      if (tg) tg.showAlert('Ви приєднались до гри.');
+      loadMe();
+    } catch (e) {
+      if (tg) tg.showAlert(e.message);
+    }
   }
 
   async function createGame() {

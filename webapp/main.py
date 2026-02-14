@@ -72,6 +72,11 @@ class EntryAdd(BaseModel):
     user_id: int | None = None  # default = current user
 
 
+class JoinGameBody(BaseModel):
+    game_id: int
+    stake: int | None = None  # сума ставки (грн)
+
+
 # ----- Auth: require valid Telegram initData -----
 
 
@@ -142,17 +147,42 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
             "current_round": g.current_round,
             "rounds_total": g.rounds_total,
             "status": e.status,
+            "stake": e.stake,
         }
         for (e, g) in entries
     ]
     result = {"user_id": uid, "is_admin": is_admin, "entries": entries_list}
-    if is_admin:
-        games = db.execute(select(Game).order_by(Game.id.desc())).scalars().all()
-        result["games"] = [
-            {"id": g.id, "title": g.title, "current_round": g.current_round, "rounds_total": g.rounds_total, "status": g.status}
-            for g in games
-        ]
+    games = db.execute(select(Game).where(Game.status == "active").order_by(Game.id.desc())).scalars().all()
+    result["games"] = [
+        {"id": g.id, "title": g.title, "current_round": g.current_round, "rounds_total": g.rounds_total, "status": g.status}
+        for g in games
+    ]
     return result
+
+
+@app.post("/api/join_game")
+async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Будь-який гравець може приєднатися до гри (створити собі запис). Опційно вказати суму ставки."""
+    game = db.get(Game, body.game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Гру не знайдено")
+    if game.status != "active":
+        raise HTTPException(status_code=400, detail="Гра не активна")
+    user = db.get(User, uid)
+    if not user:
+        user = User(tg_id=uid)
+        db.add(user)
+        db.flush()
+    existing = db.execute(
+        select(Entry).where(Entry.user_id == uid, Entry.game_id == body.game_id)
+    ).scalars().first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Ви вже приєднані до цієї гри")
+    entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": entry.stake}
 
 
 @app.get("/api/teams/available")

@@ -37,6 +37,7 @@ class Entry(Base):
     user_id = Column(Integer, ForeignKey("users.tg_id"), nullable=False)
     game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
     status = Column(String(32), default="active")  # active | out
+    stake = Column(Integer, nullable=True)  # сума ставки (наприклад у гривнях)
 
     user = relationship("User", back_populates="entries")
     game = relationship("Game", back_populates="entries")

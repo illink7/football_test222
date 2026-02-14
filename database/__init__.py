@@ -37,19 +37,19 @@ def init_db():
 
 
 def seed_teams():
-    """Insert 20 default football teams if the table is empty."""
+    """Insert default football teams (add if not exist by name)."""
     from sqlalchemy import select
     from database.models import Team
+    teams = [
+        "Вулверхэмптон", "Арсенал", "Борнмут", "Ман Юнайтед", "Брайтон",
+        "Ливерпуль", "Фулхэм", "Бернли", "Ман Сити", "Кристал Пэлас",
+        "Эвертон", "Челси", "Лидс", "Брентфорд", "Ньюкасл",
+        "Сандерленд", "Астон Вилла", "Вест Хэм", "Тоттенхэм", "Ноттингем Форест",
+    ]
     with SessionLocal() as db:
-        if db.execute(select(Team)).scalars().first() is not None:
-            return
-        teams = [
-            "Арсенал", "Манчестер Сіті", "Ліверпуль", "Челсі", "Манчестер Юнайтед",
-            "Тоттенхем", "Ньюкасл", "Астон Вілла", "Брайтон", "Вест Хем",
-            "Кристал Пелес", "Вулвергемптон", "Борнмут", "Фулхем", "Брентфорд",
-            "Евертон", "Ноттінгем Форест", "Лідс", "Лестер Сіті", "Саутгемптон",
-            "Бернли", "Сандерленд",
-        ]
+        existing = {r[0] for r in db.execute(select(Team.name)).scalars().all()}
         for name in teams:
-            db.add(Team(name=name))
+            if name not in existing:
+                db.add(Team(name=name))
+                existing.add(name)
         db.commit()
