@@ -41,11 +41,24 @@ def _ensure_entries_stake_column():
             conn.commit()
 
 
+def _ensure_matches_goals_columns():
+    """Add matches.home_goals and away_goals if missing."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('matches') WHERE name='home_goals'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN home_goals INTEGER"))
+            conn.execute(text("ALTER TABLE matches ADD COLUMN away_goals INTEGER"))
+            conn.commit()
+
+
 def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
     Base.metadata.create_all(bind=engine)
     _ensure_entries_stake_column()
+    _ensure_matches_goals_columns()
 
 
 def seed_teams():

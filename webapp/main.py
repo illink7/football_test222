@@ -2,6 +2,7 @@
 FastAPI app for Telegram Web App: team selection and APIs.
 Bot is started separately in main.py via asyncio.gather (same process).
 """
+import random
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
@@ -51,6 +52,22 @@ class MatchItem(BaseModel):
 class MatchSelectionSubmit(BaseModel):
     entry_id: int
     match_ids: list[int]
+
+
+class MatchScoreItem(BaseModel):
+    home_name: str
+    away_name: str
+    home_goals: int
+    away_goals: int
+
+
+class RoundResultResponse(BaseModel):
+    passed: bool
+    round: int
+    matches: list[MatchScoreItem]
+    your_team1_scored: bool
+    your_team2_scored: bool
+    message: str
 
 
 class SubmitTwoTeams(BaseModel):
@@ -350,7 +367,7 @@ async def submit_match_selections(entry_id: int, body: MatchSelectionSubmit, db=
 
 @app.get("/api/entry/{entry_id}/teams_for_round")
 async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
-    """List of teams playing this round (unique from matches). User must pick exactly 2 that will score."""
+    """List of teams playing this round that user can still pick (excludes teams already used in previous rounds)."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -360,6 +377,20 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
+    # Teams already used by this entry in previous rounds — cannot pick again
+    used_team_ids: set[int] = set()
+    prev_selections = (
+        db.execute(
+            select(Selection.team1_id, Selection.team2_id).where(
+                Selection.entry_id == entry_id,
+                Selection.round < rnd,
+            )
+        )
+        .all()
+    )
+    for row in prev_selections:
+        used_team_ids.add(row[0])
+        used_team_ids.add(row[1])
     matches = (
         db.execute(
             select(Match)
@@ -372,7 +403,7 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
     teams_list: list[Team] = []
     for m in matches:
         for tid in (m.home_team_id, m.away_team_id):
-            if tid not in seen:
+            if tid not in seen and tid not in used_team_ids:
                 seen.add(tid)
                 t = db.get(Team, tid)
                 if t:
@@ -381,6 +412,7 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
         "entry_id": entry_id,
         "round": rnd,
         "teams": [TeamItem(id=t.id, name=t.name) for t in teams_list],
+        "used_team_ids": list(used_team_ids),
     }
 
 
@@ -424,6 +456,107 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     db.add(Selection(entry_id=entry_id, round=rnd, team1_id=body.team1_id, team2_id=body.team2_id))
     db.commit()
     return {"ok": True, "round": rnd}
+
+
+MIN_GOALS, MAX_GOALS = 0, 3
+
+
+@app.post("/api/entry/{entry_id}/run_round")
+async def run_round(entry_id: int, db=Depends(get_db)):
+    """Simulate round: generate goals if not yet done, check all entries, advance round. Returns result for this entry."""
+    entry = db.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.status != "active":
+        raise HTTPException(status_code=400, detail="Entry is not active")
+    game = db.get(Game, entry.game_id)
+    if not game or game.status != "active":
+        raise HTTPException(status_code=400, detail="Game not active")
+    rnd = game.current_round
+    sel_row = (
+        db.execute(
+            select(Selection).where(
+                Selection.entry_id == entry_id,
+                Selection.round == rnd,
+            )
+        )
+        .scalars().first()
+    )
+    if not sel_row:
+        raise HTTPException(status_code=400, detail="Спочатку обери дві команди для цього туру")
+    selection = sel_row[0]
+    matches = (
+        db.execute(
+            select(Match)
+            .where(Match.game_id == game.id, Match.round == rnd)
+            .order_by(Match.id)
+        )
+        .scalars().all()
+    )
+    if not matches:
+        raise HTTPException(status_code=400, detail="Немає матчів у цьому турі")
+    round_just_simulated = False
+    if matches[0].home_goals is None:
+        round_just_simulated = True
+        for m in matches:
+            m.home_goals = random.randint(MIN_GOALS, MAX_GOALS)
+            m.away_goals = random.randint(MIN_GOALS, MAX_GOALS)
+        scored_team_ids: set[int] = set()
+        for m in matches:
+            if m.home_goals and m.home_goals >= 1:
+                scored_team_ids.add(m.home_team_id)
+            if m.away_goals and m.away_goals >= 1:
+                scored_team_ids.add(m.away_team_id)
+        entries_with_selection = (
+            db.execute(
+                select(Selection.entry_id, Selection.team1_id, Selection.team2_id).where(
+                    Selection.round == rnd,
+                )
+            )
+            .all()
+        )
+        for row in entries_with_selection:
+            eid, t1, t2 = row[0], row[1], row[2]
+            if t1 not in scored_team_ids or t2 not in scored_team_ids:
+                e = db.get(Entry, eid)
+                if e:
+                    e.status = "out"
+        game.current_round += 1
+        db.commit()
+        db.refresh(game)
+        if round_just_simulated:
+            for m in matches:
+                db.refresh(m)
+    scored_team_ids = set()
+    for m in matches:
+        if m.home_goals and m.home_goals >= 1:
+            scored_team_ids.add(m.home_team_id)
+        if m.away_goals and m.away_goals >= 1:
+            scored_team_ids.add(m.away_team_id)
+    your_t1 = selection.team1_id in scored_team_ids
+    your_t2 = selection.team2_id in scored_team_ids
+    passed = your_t1 and your_t2
+    match_items = [
+        MatchScoreItem(
+            home_name=m.home_team.name,
+            away_name=m.away_team.name,
+            home_goals=m.home_goals or 0,
+            away_goals=m.away_goals or 0,
+        )
+        for m in matches
+    ]
+    if passed:
+        msg = "Обидві ваші команди забили — ви проходите далі!"
+    else:
+        msg = "Одна або обидві команди не забили. Ви вибуваєте."
+    return RoundResultResponse(
+        passed=passed,
+        round=rnd,
+        matches=match_items,
+        your_team1_scored=your_t1,
+        your_team2_scored=your_t2,
+        message=msg,
+    )
 
 
 # ----- Admin API (require_admin) -----

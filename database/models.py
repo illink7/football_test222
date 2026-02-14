@@ -63,7 +63,7 @@ class Team(Base):
 
 
 class Match(Base):
-    """Fixture for a round: home_team vs away_team."""
+    """Fixture for a round: home_team vs away_team. home_goals/away_goals set when round is simulated."""
     __tablename__ = "matches"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -71,6 +71,8 @@ class Match(Base):
     round = Column(Integer, nullable=False)
     home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    home_goals = Column(Integer, nullable=True)  # filled after round simulation
+    away_goals = Column(Integer, nullable=True)
 
     game = relationship("Game", back_populates="matches")
     home_team = relationship("Team", foreign_keys=[home_team_id])

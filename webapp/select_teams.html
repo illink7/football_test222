@@ -95,6 +95,18 @@
     .success-screen h2 { font-size: 1.25rem; margin: 0 0 12px; }
     .success-screen .chosen { font-size: 1.1rem; margin: 16px 0; line-height: 1.6; }
     .success-screen .wait { color: var(--success); font-weight: 500; margin-top: 24px; }
+    .countdown-screen { text-align: center; padding: 32px 20px; }
+    .countdown-screen .big-num { font-size: 4rem; font-weight: 700; color: var(--accent); line-height: 1.2; margin: 16px 0; }
+    .countdown-screen .hint { font-size: 0.95rem; opacity: 0.9; margin-top: 12px; }
+    .results-screen { padding: 20px 0; }
+    .results-screen .icon { font-size: 3rem; margin-bottom: 12px; text-align: center; }
+    .results-screen h2 { font-size: 1.25rem; margin: 0 0 16px; text-align: center; }
+    .results-screen .message { text-align: center; margin-bottom: 20px; font-size: 1.05rem; line-height: 1.5; }
+    .results-screen .message.passed { color: var(--success); }
+    .results-screen .message.out { color: var(--accent); }
+    .match-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 8px; background: var(--card-bg); border-radius: 10px; font-size: 0.95rem; }
+    .match-score .score { font-weight: 600; margin: 0 8px; }
+    .btn-next { margin-top: 20px; background: var(--success); color: #1a1a2e; }
   </style>
 </head>
 <body>
@@ -200,6 +212,61 @@
     });
   }
 
+  function startCountdownThenRunRound() {
+    const countdownEl = contentEl.querySelector('.success-screen');
+    if (!countdownEl) return;
+    const waitEl = countdownEl.querySelector('.wait');
+    let sec = 10;
+    function tick() {
+      if (sec > 0) {
+        waitEl.textContent = sec + '… Скоро будуть результати.';
+        sec--;
+        setTimeout(tick, 1000);
+        return;
+      }
+      waitEl.textContent = 'Завантаження результатів…';
+      fetch(baseUrl + '/api/entry/' + entryId + '/run_round', { method: 'POST' })
+        .then(r => r.json())
+        .then(function (data) {
+          showResultsScreen(data);
+        })
+        .catch(function () {
+          if (tg) tg.showAlert('Не вдалося отримати результати');
+          else alert('Не вдалося отримати результати');
+          waitEl.textContent = 'Помилка. Оновіть сторінку.';
+        });
+    }
+    tick();
+  }
+
+  function showResultsScreen(data) {
+    const passed = data.passed === true;
+    let html = '<div class="results-screen">';
+    html += '<div class="icon">' + (passed ? '✅' : '❌') + '</div>';
+    html += '<h2>' + (passed ? 'Ви проходите далі!' : 'Ви вибуваєте') + '</h2>';
+    html += '<p class="message ' + (passed ? 'passed' : 'out') + '">' + escapeHtml(data.message || '') + '</p>';
+    if (data.matches && data.matches.length) {
+      data.matches.forEach(function (m) {
+        html += '<div class="match-score">' +
+          '<span>' + escapeHtml(m.home_name) + '</span>' +
+          '<span class="score">' + m.home_goals + ' : ' + m.away_goals + '</span>' +
+          '<span>' + escapeHtml(m.away_name) + '</span>' +
+        '</div>';
+      });
+    }
+    if (passed) {
+      html += '<button type="button" class="btn btn-success btn-next" id="btnNextRound">Обрати команди для наступного туру</button>';
+    }
+    html += '</div>';
+    contentEl.innerHTML = html;
+    const btnNext = document.getElementById('btnNextRound');
+    if (btnNext) {
+      btnNext.addEventListener('click', function () {
+        window.location.reload();
+      });
+    }
+  }
+
   async function submitTwoTeams() {
     if (selectedIds.length !== 2) {
       if (tg) tg.showAlert('Оберіть рівно дві команди');
@@ -230,10 +297,11 @@
         '<div class="success-screen">' +
           '<div class="icon">✅</div>' +
           '<h2>Ваш вибір збережено</h2>' +
-          '<p class="chosen">Ви обрали: <strong>' + escapeHtml(names[0]) + '</strong> та <strong>' + escapeHtml(names[1]) + '</strong> — команди, які заб\'ють гол у цьому турі.</p>' +
-          '<p class="wait">Очікуйте результатів</p>' +
+          '<p class="chosen">Ви обрали: <strong>' + escapeHtml(names[0]) + '</strong> та <strong>' + escapeHtml(names[1]) + '</strong>.</p>' +
+          '<p class="wait">Скоро результати — чекайте 10 секунд.</p>' +
         '</div>';
       if (tg) tg.ready();
+      startCountdownThenRunRound();
     } catch (e) {
       if (tg) tg.showAlert('Помилка мережі');
       else alert('Помилка мережі');
