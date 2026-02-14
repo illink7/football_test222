@@ -86,10 +86,16 @@ def get_current_user(
 ):
     init = init_data or x_telegram_init_data
     if not init:
-        raise HTTPException(status_code=401, detail="Missing init_data (Telegram Web App)")
+        raise HTTPException(
+            status_code=401,
+            detail="Відкрийте додаток з чату бота Survivor Football (кнопка меню або /start), а не в браузері.",
+        )
     uid = get_user_id_from_init_data(init, BOT_TOKEN)
     if uid is None:
-        raise HTTPException(status_code=401, detail="Invalid init_data")
+        raise HTTPException(
+            status_code=401,
+            detail="Помилка перевірки: відкрийте додаток саме з бота Survivor Football. Якщо ви зайшли з іншого бота — авторизація не працюватиме.",
+        )
     return uid
 
 
