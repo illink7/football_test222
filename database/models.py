@@ -27,6 +27,7 @@ class Game(Base):
     status = Column(String(32), default="active")  # e.g. active, finished
 
     entries = relationship("Entry", back_populates="game", lazy="selectin")
+    matches = relationship("Match", back_populates="game", lazy="selectin")
 
 
 class Entry(Base):
@@ -45,6 +46,11 @@ class Entry(Base):
         lazy="selectin",
         order_by="Selection.round",
     )
+    match_selections = relationship(
+        "EntryMatchSelection",
+        back_populates="entry",
+        lazy="selectin",
+    )
 
 
 class Team(Base):
@@ -53,6 +59,34 @@ class Team(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(128), unique=True, nullable=False)
+
+
+class Match(Base):
+    """Fixture for a round: home_team vs away_team."""
+    __tablename__ = "matches"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
+    round = Column(Integer, nullable=False)
+    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+
+    game = relationship("Game", back_populates="matches")
+    home_team = relationship("Team", foreign_keys=[home_team_id])
+    away_team = relationship("Team", foreign_keys=[away_team_id])
+    entry_selections = relationship("EntryMatchSelection", back_populates="match", lazy="selectin")
+
+
+class EntryMatchSelection(Base):
+    """User's selected matches for a round (which matches they 'bet' on)."""
+    __tablename__ = "entry_match_selections"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entry_id = Column(Integer, ForeignKey("entries.id"), nullable=False)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
+
+    entry = relationship("Entry", back_populates="match_selections")
+    match = relationship("Match", back_populates="entry_selections")
 
 
 class Selection(Base):

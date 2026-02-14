@@ -58,6 +58,7 @@ Football/
 - **/create_game \<title>** — Create a new game (10 rounds).
 - **/add_teams Team1, Team2, ...** — Add teams to the pool (e.g. `Arsenal, Chelsea, ManCity`).
 - **/add_entry \<game_id> [tg_id]** — Add an entry for a user (default: you).
+- **/add_matches \<game_id> \<round> "Home1 — Away1, Home2 — Away2, ..."** — Add fixtures for a round (use — or - between team names). Names must match DB (e.g. Манчестер Юнайтед, Ліверпуль).
 - **/result \<game_id> \<results_string>** — Submit round results and advance game.  
   Example: `/result 1 Arsenal:1, Chelsea:0, ManCity:2`  
   Entries that picked a team with 0 goals get status `out`. Game moves to next round (or `finished`).

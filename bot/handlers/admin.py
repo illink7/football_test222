@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from config import ADMIN_ID
 from database import SessionLocal
-from database.models import Game, Entry, Selection, Team, User
+from database.models import Game, Entry, Selection, Team, User, Match
 
 router = Router(name="admin")
 
@@ -20,10 +20,10 @@ def is_admin(tg_id: int) -> bool:
 
 @router.message(Command("create_game"), F.from_user.id == ADMIN_ID)
 async def cmd_create_game(message: Message):
-    """Create a new game. Usage: /create_game <title>"""
+    """Create a new game. Usage: /create_game (title)"""
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Usage: /create_game <title>\nExample: /create_game Premier League Survivor")
+        await message.answer("Usage: /create_game (title)\nExample: /create_game Premier League Survivor")
         return
     title = args[1].strip()
     db: Session = SessionLocal()
@@ -39,10 +39,10 @@ async def cmd_create_game(message: Message):
 
 @router.message(Command("add_entry"), F.from_user.id == ADMIN_ID)
 async def cmd_add_entry(message: Message):
-    """Add an entry for a user to a game. Usage: /add_entry <game_id> [tg_id] (tg_id default: you)."""
+    """Add an entry for a user to a game. Usage: /add_entry (game_id) [tg_id] (tg_id default: you)."""
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Usage: /add_entry <game_id> [tg_id]")
+        await message.answer("Usage: /add_entry (game_id) [tg_id]")
         return
     try:
         game_id = int(parts[1])
@@ -104,17 +104,76 @@ async def cmd_add_teams(message: Message):
         db.close()
 
 
+@router.message(Command("add_matches"), F.from_user.id == ADMIN_ID)
+async def cmd_add_matches(message: Message):
+    """
+    Add matches for a round. Usage: /add_matches (game_id) (round) (matches_text)
+    Matches: "Home1 — Away1, Home2 — Away2, ..." (use — or -)
+    Example: /add_matches 1 1 "Вулвергемптон — Арсенал, Борнмут — Манчестер Юнайтед"
+    """
+    parts = message.text.split(maxsplit=3)
+    if len(parts) < 4:
+        await message.answer(
+            "Usage: /add_matches (game_id) (round) \"Home1 — Away1, Home2 — Away2, ...\"\n"
+            "Example: /add_matches 1 1 \"Вулвергемптон — Арсенал, Борнмут — Манчестер Юнайтед\""
+        )
+        return
+    try:
+        game_id = int(parts[1])
+        rnd = int(parts[2])
+    except ValueError:
+        await message.answer("game_id and round must be numbers.")
+        return
+    text = parts[3].strip().strip('"\'')
+    db: Session = SessionLocal()
+    try:
+        game = db.get(Game, game_id)
+        if not game:
+            await message.answer("Game not found.")
+            return
+        teams_list = db.execute(select(Team)).scalars().all()
+        teams_by_name = {t.name: t for t in teams_list}
+        added = 0
+        for pair in text.split(","):
+            pair = pair.strip()
+            sep = " — " if " — " in pair else " - " if " - " in pair else "–"
+            if sep not in pair:
+                continue
+            home_name, away_name = pair.split(sep, 1)
+            home_name, away_name = home_name.strip(), away_name.strip()
+            home = teams_by_name.get(home_name)
+            away = teams_by_name.get(away_name)
+            if not home or not away:
+                await message.answer(f"Team not found: «{home_name}» or «{away_name}». Add with /add_teams.")
+                return
+            existing = db.execute(
+                select(Match).where(
+                    Match.game_id == game_id,
+                    Match.round == rnd,
+                    Match.home_team_id == home.id,
+                    Match.away_team_id == away.id,
+                )
+            ).scalars().first()
+            if not existing:
+                db.add(Match(game_id=game_id, round=rnd, home_team_id=home.id, away_team_id=away.id))
+                added += 1
+        db.commit()
+        await message.answer(f"Added {added} match(es) for game {game_id}, round {rnd}.")
+    finally:
+        db.close()
+
+
 @router.message(Command("result"), F.from_user.id == ADMIN_ID)
 async def cmd_result(message: Message):
     """
     Submit round results and advance game.
-    Usage: /result <game_id> <results_string>
+    Usage: /result (game_id) (results_string)
     Example: /result 1 Arsenal:1, Chelsea:0, ManCity:2
     """
     parts = message.text.split(maxsplit=2)
     if len(parts) < 3:
         await message.answer(
-            "Usage: /result <game_id> <results_string>\n"
+            "Usage: /result (game_id) (results_string)\n"
             "Example: /result 1 Arsenal:1, Chelsea:0, ManCity:2"
         )
         return
