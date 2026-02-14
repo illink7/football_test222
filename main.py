@@ -1,16 +1,24 @@
 """
 Single entry point for Railway: FastAPI + aiogram bot in one process.
-Creates SQLite DB and tables on startup if they don't exist.
+Runs both simultaneously via asyncio.gather. Creates DB and seeds teams on startup.
 """
+import asyncio
 import os
 
-from database import init_db
+from database import init_db, seed_teams
 from webapp.main import app
 
 if __name__ == "__main__":
-    # Ensure DB and tables exist before starting the server (and bot in lifespan)
     init_db()
+    seed_teams()
 
-    import uvicorn
+    from uvicorn import Config, Server
+    from bot.main import run_bot
+
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    server = Server(Config(app, host="0.0.0.0", port=port))
+
+    async def main():
+        await asyncio.gather(server.serve(), run_bot())
+
+    asyncio.run(main())

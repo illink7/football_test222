@@ -1,9 +1,7 @@
 """
 FastAPI app for Telegram Web App: team selection and APIs.
-Bot runs in background via lifespan (single process for Railway).
+Bot is started separately in main.py via asyncio.gather (same process).
 """
-import asyncio
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, Query
@@ -12,30 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from database import get_db, init_db
+from database import get_db
 from database.models import Entry, Game, Selection, Team
 
 BASE_DIR = Path(__file__).resolve().parent
-_bot_task: asyncio.Task | None = None
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Create DB, start bot in background; on shutdown stop bot."""
-    global _bot_task
-    init_db()
-    from bot.main import run_bot
-    _bot_task = asyncio.create_task(run_bot())
-    yield
-    if _bot_task and not _bot_task.done():
-        _bot_task.cancel()
-        try:
-            await _bot_task
-        except asyncio.CancelledError:
-            pass
-
-
-app = FastAPI(title="Survivor Football Web App", lifespan=lifespan)
+app = FastAPI(title="Survivor Football Web App")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -34,3 +34,21 @@ def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
     Base.metadata.create_all(bind=engine)
+
+
+def seed_teams():
+    """Insert 20 default football teams if the table is empty."""
+    from sqlalchemy import select
+    from database.models import Team
+    with SessionLocal() as db:
+        if db.execute(select(Team)).scalars().first() is not None:
+            return
+        teams = [
+            "Арсенал", "Манчестер Сіті", "Ліверпуль", "Челсі", "Манчестер Юнайтед",
+            "Тоттенхем", "Ньюкасл", "Астон Вілла", "Брайтон", "Вест Хем",
+            "Кристал Пелес", "Вулвергемптон", "Борнмут", "Фулхем", "Брентфорд",
+            "Евертон", "Ноттінгем Форест", "Лідс", "Лестер Сіті", "Саутгемптон",
+        ]
+        for name in teams:
+            db.add(Team(name=name))
+        db.commit()

@@ -5,9 +5,9 @@ Load from environment or .env; keep secrets out of version control.
 import os
 from pathlib import Path
 
-# Bot
-BOT_TOKEN: str = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_ID: int = int(os.getenv("ADMIN_ID", "0"))  # Telegram user ID of admin
+# Bot (for production set BOT_TOKEN and ADMIN_ID in environment variables)
+BOT_TOKEN: str = os.getenv("BOT_TOKEN", "7995725678:AAFNNQFMHnG5GT3ix-bl8lyUoDGoKpYvpUM")
+ADMIN_ID: int = int(os.getenv("ADMIN_ID", "8386941234"))  # Telegram user ID of admin
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent
