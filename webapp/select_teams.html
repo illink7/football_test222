@@ -25,6 +25,7 @@
     .round { opacity: 0.8; font-size: 0.9rem; margin-bottom: 16px; }
     .loading, .error { padding: 12px; text-align: center; }
     .error { color: #f88; }
+    .info { color: #8cf; margin-bottom: 12px; }
     select {
       width: 100%;
       padding: 12px;
@@ -68,7 +69,15 @@
       const baseUrl = window.location.origin;
 
       if (!entryId) {
-        document.getElementById('content').innerHTML = '<p class="error">Missing entry_id in URL.</p>';
+        const tg = window.Telegram?.WebApp;
+        const botName = tg?.initDataUnsafe?.user ? 'the bot' : 'бот';
+        document.getElementById('content').innerHTML =
+          '<p class="info">Survivor Football</p>' +
+          '<p>Надішли боту команду <b>/start</b> — там з\'явиться кнопка «Обрати команди» для твого entry.</p>' +
+          '<p>Якщо записів ще немає, адмін має створити гру та додати тобі entry.</p>';
+        document.getElementById('roundInfo').textContent = '';
+        document.getElementById('submitBtn').style.display = 'none';
+        if (tg) tg.ready();
         return;
       }
 

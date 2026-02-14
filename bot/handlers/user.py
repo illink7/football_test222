@@ -40,11 +40,14 @@ async def cmd_start(message: Message):
 
         if not entries:
             await message.answer(
-                "Welcome to Survivor Football.\n\n"
-                "You have no entries yet. Join a game by purchasing an entry (ticket) "
-                "and then pick 2 teams each round. If both score > 0, you survive. "
-                "Used teams are blocked for future rounds.\n\n"
-                "My Entries: (none)"
+                "Вітаю в Survivor Football.\n\n"
+                "У тебе ще немає записів. Адмін має створити гру та додати тобі entry (/add_entry). "
+                "Потім тут з’явиться кнопка «Обрати команди» — відкриється веб-додаток.\n\n"
+                "Щоб веб-додаток був у меню бота (кнопка внизу чату): у @BotFather → твій бот → "
+                "Bot Settings → Menu Button → Configure → вкажи URL свого додатку (наприклад Railway).",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="Відкрити веб-додаток", web_app=WebAppInfo(url=WEBAPP_BASE_URL.rstrip("/")))]
+                ]),
             )
             return
 

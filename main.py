@@ -19,6 +19,12 @@ if __name__ == "__main__":
     server = Server(Config(app, host="0.0.0.0", port=port))
 
     async def main():
-        await asyncio.gather(server.serve(), run_bot())
+        try:
+            await asyncio.gather(server.serve(), run_bot())
+        except asyncio.CancelledError:
+            pass  # Ctrl+C or shutdown — exit cleanly
 
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
