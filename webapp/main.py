@@ -158,7 +158,17 @@ async def select_teams_page():
 
 @app.get("/api/me")
 async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Повертає user_id, is_admin (True лише для 8386941234), entries. Решта юзерів — юзер-панель."""
+    """Повертає user_id, is_admin, balance (поінты), entries. При першому заході юзер отримує 1000 поінтів."""
+    user = db.get(User, uid)
+    if not user:
+        user = User(tg_id=uid, balance=1000)  # новий юзер — 1000 поінтів
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    if user.balance is None:
+        user.balance = 1000
+        db.commit()
+        db.refresh(user)
     is_admin = uid == ADMIN_ID
     entries = (
         db.execute(
@@ -181,7 +191,7 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
         }
         for (e, g) in entries
     ]
-    result = {"user_id": uid, "is_admin": is_admin, "entries": entries_list}
+    result = {"user_id": uid, "is_admin": is_admin, "balance": user.balance or 1000, "entries": entries_list}
     games = db.execute(select(Game).where(Game.status == "active").order_by(Game.id.desc())).scalars().all()
     result["games"] = [
         {"id": g.id, "title": g.title, "current_round": g.current_round, "rounds_total": g.rounds_total, "status": g.status}
@@ -200,20 +210,29 @@ async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db
         raise HTTPException(status_code=400, detail="Гра не активна")
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid)
+        user = User(tg_id=uid, balance=1000)
         db.add(user)
         db.flush()
+    if user.balance is None:
+        user.balance = 1000
     existing = db.execute(
         select(Entry).where(Entry.user_id == uid, Entry.game_id == body.game_id)
     ).scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="Ви вже приєднані до цієї гри")
     initial_stake = float(body.stake) if body.stake is not None else 10.0
-    entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=initial_stake)
+    stake_int = int(round(initial_stake))
+    if stake_int < 1:
+        raise HTTPException(status_code=400, detail="Мінімальна ставка — 1 грн")
+    if user.balance < stake_int:
+        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Ваш баланс: " + str(user.balance))
+    user.balance -= stake_int
+    entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=float(stake_int))
     db.add(entry)
     db.commit()
     db.refresh(entry)
-    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": entry.stake_amount}
+    db.refresh(user)
+    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": entry.stake_amount, "balance": user.balance}
 
 
 @app.get("/api/teams/available")
@@ -591,7 +610,7 @@ async def run_round(entry_id: int, db=Depends(get_db)):
 
 @app.post("/api/entry/{entry_id}/cash_out")
 async def cash_out(entry_id: int, db=Depends(get_db)):
-    """Забрати виграш: запис більше не активний, гравець отримує поточну суму ставки."""
+    """Забрати виграш: сума додається до балансу юзера, запис більше не активний."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -600,9 +619,14 @@ async def cash_out(entry_id: int, db=Depends(get_db)):
     amount = entry.stake_amount if entry.stake_amount is not None else entry.stake
     if amount is None:
         amount = 0.0
+    amount_float = float(amount)
+    user = db.get(User, entry.user_id)
+    if user:
+        user.balance = (user.balance or 0) + int(round(amount_float))
     entry.status = "cashed_out"
     db.commit()
-    return {"ok": True, "amount": float(amount)}
+    new_balance = user.balance if user else None
+    return {"ok": True, "amount": amount_float, "balance": new_balance}
 
 
 # ----- Admin API (require_admin) -----

@@ -85,6 +85,8 @@
     .form-row:last-child { margin-bottom: 0; }
     .field-label { font-size: 0.85rem; opacity: 0.9; margin-bottom: 6px; display: block; }
     .hint { font-size: 0.8rem; opacity: 0.7; margin-top: 6px; }
+    .balance-line { font-size: 1rem; margin-bottom: 12px; color: var(--success); }
+    .balance-line strong { font-weight: 700; }
     .error-inline { color: #e94560; opacity: 1; }
     .admin-only { display: none; }
     .user-only { display: none; }
@@ -189,20 +191,16 @@
     <div id="user" class="user-only">
       <section class="section" id="joinSection">
         <h2 class="section-title">🎯 Приєднатися до гри</h2>
+        <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поінтів</p>
         <div class="card" id="joinCard">
           <div class="form-row">
             <label class="field-label">Гра</label>
             <select id="joinGameId"><option value="">— оберіть гру —</option></select>
           </div>
           <div class="form-row">
-            <label class="field-label">Сума ставки (грн)</label>
+            <label class="field-label">Сума ставки (поінтів)</label>
             <select id="joinStake">
-              <option value="">— без ставки —</option>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="200">200</option>
+              <option value="">— оберіть ставку —</option>
             </select>
           </div>
           <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
@@ -252,9 +250,28 @@
       document.getElementById('btnSetTeams').onclick = setTeams;
       document.getElementById('btnAddMatches').onclick = addMatches;
     } else {
+      const balance = me.balance != null ? Number(me.balance) : 1000;
+      document.getElementById('balanceValue').textContent = balance;
+      fillStakeSelect(balance);
       fillJoinGameSelect(me.games || []);
       document.getElementById('btnJoin').onclick = joinGame;
       renderEntriesList(me.entries || [], me.games || []);
+    }
+  }
+
+  const STAKE_OPTIONS = [10, 20, 50, 100, 200];
+
+  function fillStakeSelect(balance) {
+    const sel = document.getElementById('joinStake');
+    if (!sel) return;
+    let opts = '<option value="">— оберіть ставку —</option>';
+    STAKE_OPTIONS.forEach(function (v) {
+      if (v <= balance) opts += '<option value="' + v + '">' + v + ' поінтів</option>';
+    });
+    sel.innerHTML = opts;
+    if (balance < 10) {
+      opts += '<option value="" disabled>Недостатньо поінтів (мін. 10)</option>';
+      sel.innerHTML = opts;
     }
   }
 
@@ -328,6 +345,10 @@
     const stakeVal = stakeEl && stakeEl.value ? parseInt(stakeEl.value, 10) : null;
     if (!gameId) {
       if (tg) tg.showAlert('Оберіть гру');
+      return;
+    }
+    if (!stakeVal || stakeVal < 10) {
+      if (tg) tg.showAlert('Оберіть суму ставки (мін. 10 поінтів)');
       return;
     }
     try {

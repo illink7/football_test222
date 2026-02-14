@@ -315,11 +315,13 @@
           .then(function (r) { return r.json(); })
           .then(function (res) {
             const amount = res.amount != null ? formatStake(res.amount) : '0';
+            const balanceStr = res.balance != null ? '<p class="stake-line">Ваш баланс тепер: <strong>' + res.balance + '</strong> поінтів</p>' : '';
             contentEl.innerHTML =
               '<div class="results-screen win-screen">' +
                 '<div class="icon">🏆</div>' +
                 '<h2>Ви виграли!</h2>' +
-                '<p class="amount">' + amount + ' грн</p>' +
+                '<p class="amount">' + amount + ' поінтів</p>' +
+                balanceStr +
                 '<p class="message passed">Ви забрали виграш. Дякуємо за гру!</p>' +
                 '<button type="button" class="btn btn-success btn-next" id="btnMainMenuWin">На головне меню</button>' +
               '</div>';

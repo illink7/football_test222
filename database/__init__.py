@@ -66,6 +66,18 @@ def _ensure_entries_stake_amount_column():
             conn.commit()
 
 
+def _ensure_users_balance_column():
+    """Add users.balance if missing; new users get 1000 поінтів."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('users') WHERE name='balance'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 1000"))
+            conn.execute(text("UPDATE users SET balance = 1000 WHERE balance IS NULL"))
+            conn.commit()
+
+
 def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
@@ -73,6 +85,7 @@ def init_db():
     _ensure_entries_stake_column()
     _ensure_matches_goals_columns()
     _ensure_entries_stake_amount_column()
+    _ensure_users_balance_column()
 
 
 def seed_teams():

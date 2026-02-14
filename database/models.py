@@ -13,6 +13,7 @@ class User(Base):
     tg_id = Column(Integer, primary_key=True)
     username = Column(String(255), nullable=True)
     is_admin = Column(Boolean, default=False)
+    balance = Column(Integer, default=1000)  # поінты (грн), 1000 при першому заході
 
     entries = relationship("Entry", back_populates="user", lazy="selectin")
 
