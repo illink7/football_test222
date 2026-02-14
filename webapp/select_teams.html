@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Обрати матчі — Survivor Football</title>
+  <title>Обрати дві команди — Survivor Football</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -40,31 +40,38 @@
       background: var(--card-bg);
       border-radius: 20px;
     }
-    .content { padding: 20px 0; }
+    .intro {
+      text-align: center;
+      padding: 12px 0 16px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      opacity: 0.95;
+    }
+    .content { padding: 8px 0 20px; }
     .loading { text-align: center; padding: 40px 20px; opacity: 0.9; }
     .error { color: #e94560; padding: 16px; text-align: center; background: rgba(233,69,96,0.1); border-radius: 12px; margin-bottom: 16px; }
     .info { color: #8cf; padding: 16px; text-align: center; line-height: 1.5; }
-    .match-row {
+    .team-row {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 16px 18px;
-      margin-bottom: 10px;
+      padding: 14px 18px;
+      margin-bottom: 8px;
       background: var(--card-bg);
       border: 2px solid var(--card-border);
       border-radius: 14px;
       cursor: pointer;
       transition: background 0.2s, border-color 0.2s;
     }
-    .match-row:active { opacity: 0.95; }
-    .match-row.selected {
+    .team-row:active { opacity: 0.95; }
+    .team-row.selected {
       background: rgba(78, 204, 163, 0.2);
       border-color: var(--success);
     }
-    .match-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-    .match-row.selected .check { background: var(--success); border-color: var(--success); color: #1a1a2e; }
-    .match-row .teams { flex: 1; text-align: center; font-size: 0.95rem; }
-    .match-row .vs { opacity: 0.6; margin: 0 6px; font-size: 0.9rem; }
+    .team-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .team-row.selected .check { background: var(--success); border-color: var(--success); color: #1a1a2e; }
+    .team-row .name { flex: 1; font-size: 1rem; }
+    .counter { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; text-align: center; }
     .btn {
       display: flex;
       align-items: center;
@@ -85,24 +92,27 @@
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .success-screen { text-align: center; padding: 32px 20px; }
     .success-screen .icon { font-size: 3rem; margin-bottom: 16px; }
-    .success-screen h2 { font-size: 1.25rem; margin: 0 0 20px; }
-    .summary-list { text-align: left; margin: 16px 0; padding-left: 20px; line-height: 1.8; }
-    .success-screen .wait { color: var(--success); font-weight: 500; margin-top: 20px; }
+    .success-screen h2 { font-size: 1.25rem; margin: 0 0 12px; }
+    .success-screen .chosen { font-size: 1.1rem; margin: 16px 0; line-height: 1.6; }
+    .success-screen .wait { color: var(--success); font-weight: 500; margin-top: 24px; }
   </style>
 </head>
 <body>
   <div class="container">
     <header class="header">
-      <h1>⚽ Обрати матчі</h1>
-      <div class="round-badge" id="roundInfo">Раунд —</div>
+      <h1>⚽ Обрати команди</h1>
+      <div class="round-badge" id="roundInfo">Тур —</div>
     </header>
 
+    <p class="intro" id="intro">Виберіть дві команди, які заб'ють гол у цьому турі.</p>
+
     <div id="content" class="content">
-      <p class="loading">Завантаження матчів…</p>
+      <p class="loading">Завантаження…</p>
     </div>
 
+    <p class="counter" id="counter" style="display:none;">Обрано: 0 з 2</p>
     <button type="button" id="submitBtn" class="btn btn-success" disabled style="display:none;">
-      ✓ Підтвердити вибір
+      Підтвердити
     </button>
   </div>
 
@@ -123,120 +133,132 @@
 
   if (!entryId) {
     document.getElementById('content').innerHTML =
-      '<p class="info">Відкрийте додаток з головного меню бота — там будуть ваші записи та кнопка «Обрати матчі».</p>' +
+      '<p class="info">Відкрийте додаток з головного меню бота — там будуть ваші записи та кнопка «Обрати команди».</p>' +
       '<p class="info">Якщо записів немає, адмін додасть вас у гру.</p>';
     document.getElementById('roundInfo').style.display = 'none';
+    document.getElementById('intro').style.display = 'none';
     document.getElementById('submitBtn').style.display = 'none';
     return;
   }
 
   const roundEl = document.getElementById('roundInfo');
+  const introEl = document.getElementById('intro');
   const contentEl = document.getElementById('content');
+  const counterEl = document.getElementById('counter');
   const submitBtn = document.getElementById('submitBtn');
 
-  let matchesData = [];
-  let selectedMatchIds = new Set();
+  let teamsData = [];
+  let selectedIds = [];
 
-  async function loadMatches() {
-    const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches');
-    if (!r.ok) throw new Error('Не вдалося завантажити матчі');
+  async function loadTeamsForRound() {
+    const r = await fetch(baseUrl + '/api/entry/' + entryId + '/teams_for_round');
+    if (!r.ok) throw new Error('Не вдалося завантажити список команд');
     return r.json();
   }
 
-  function renderMatchList(data) {
-    matchesData = data.matches || [];
-    selectedMatchIds = new Set(matchesData.filter(m => m.selected).map(m => m.id));
-    roundEl.textContent = 'Раунд ' + data.round;
+  function renderTeamList(data) {
+    teamsData = data.teams || [];
+    roundEl.textContent = 'Тур ' + data.round;
     roundEl.style.display = 'inline-block';
 
-    if (matchesData.length === 0) {
-      contentEl.innerHTML = '<p class="info">Матчів для цього раунду ще немає. Адмін незабаром їх додасть — оновіть сторінку пізніше.</p>';
+    if (teamsData.length === 0) {
+      contentEl.innerHTML = '<p class="info">Команди для цього туру ще не додано. Адмін додасть матчі — тоді з\'явиться список команд. Оновіть сторінку пізніше.</p>';
       submitBtn.style.display = 'none';
+      counterEl.style.display = 'none';
       return;
     }
 
-    const html = matchesData.map(m => {
-      const selected = selectedMatchIds.has(m.id);
-      const checkIcon = selected ? '✓' : '';
-      return '<div class="match-row' + (selected ? ' selected' : '') + '" data-match-id="' + m.id + '" role="button" tabindex="0">' +
-        '<span class="check">' + checkIcon + '</span>' +
-        '<span class="teams">' + escapeHtml(m.home_name) + '<span class="vs">—</span>' + escapeHtml(m.away_name) + '</span>' +
+    selectedIds = [];
+    const html = teamsData.map(t => {
+      return '<div class="team-row" data-team-id="' + t.id + '" role="button" tabindex="0">' +
+        '<span class="check"></span>' +
+        '<span class="name">' + escapeHtml(t.name) + '</span>' +
       '</div>';
     }).join('');
     contentEl.innerHTML = html;
+    counterEl.style.display = 'block';
+    counterEl.textContent = 'Обрано: 0 з 2';
     submitBtn.style.display = 'block';
-    submitBtn.disabled = false;
+    submitBtn.disabled = true;
 
-    contentEl.querySelectorAll('.match-row').forEach(row => {
+    contentEl.querySelectorAll('.team-row').forEach(row => {
       row.addEventListener('click', function () {
-        const id = parseInt(this.dataset.matchId, 10);
-        if (selectedMatchIds.has(id)) selectedMatchIds.delete(id);
-        else selectedMatchIds.add(id);
-        this.classList.toggle('selected', selectedMatchIds.has(id));
-        this.querySelector('.check').textContent = selectedMatchIds.has(id) ? '✓' : '';
+        const id = parseInt(this.dataset.teamId, 10);
+        const idx = selectedIds.indexOf(id);
+        if (idx >= 0) {
+          selectedIds.splice(idx, 1);
+          this.classList.remove('selected');
+          this.querySelector('.check').textContent = '';
+        } else if (selectedIds.length < 2) {
+          selectedIds.push(id);
+          this.classList.add('selected');
+          this.querySelector('.check').textContent = '✓';
+        }
+        counterEl.textContent = 'Обрано: ' + selectedIds.length + ' з 2';
+        submitBtn.disabled = selectedIds.length !== 2;
       });
     });
   }
 
-  async function submitMatches() {
-    const ids = Array.from(selectedMatchIds);
-    if (ids.length === 0) {
-      if (tg) tg.showAlert('Оберіть хоча б один матч');
-      else alert('Оберіть хоча б один матч');
+  async function submitTwoTeams() {
+    if (selectedIds.length !== 2) {
+      if (tg) tg.showAlert('Оберіть рівно дві команди');
       return;
     }
     submitBtn.disabled = true;
     submitBtn.textContent = 'Збереження…';
     try {
-      const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches', {
+      const r = await fetch(baseUrl + '/api/entry/' + entryId + '/submit_teams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entry_id: parseInt(entryId, 10), match_ids: ids })
+        body: JSON.stringify({ team1_id: selectedIds[0], team2_id: selectedIds[1] })
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         if (tg) tg.showAlert(data.detail || 'Помилка збереження');
         else alert(data.detail || 'Помилка збереження');
         submitBtn.disabled = false;
-        submitBtn.textContent = '✓ Підтвердити вибір';
+        submitBtn.textContent = 'Підтвердити';
         return;
       }
-      const names = matchesData.filter(m => ids.includes(m.id))
-        .map(m => m.home_name + ' — ' + m.away_name);
+      const names = teamsData.filter(t => selectedIds.includes(t.id)).map(t => t.name);
+      introEl.style.display = 'none';
+      counterEl.style.display = 'none';
+      submitBtn.style.display = 'none';
+      roundEl.style.display = 'none';
       contentEl.innerHTML =
         '<div class="success-screen">' +
           '<div class="icon">✅</div>' +
-          '<h2>Готово</h2>' +
-          '<p>Ви обрали матчі:</p>' +
-          '<ul class="summary-list">' + names.map(n => '<li>' + escapeHtml(n) + '</li>').join('') + '</ul>' +
-          '<p class="wait">Чекайте результатів</p>' +
+          '<h2>Ваш вибір збережено</h2>' +
+          '<p class="chosen">Ви обрали: <strong>' + escapeHtml(names[0]) + '</strong> та <strong>' + escapeHtml(names[1]) + '</strong> — команди, які заб\'ють гол у цьому турі.</p>' +
+          '<p class="wait">Очікуйте результатів</p>' +
         '</div>';
-      submitBtn.style.display = 'none';
-      roundEl.style.display = 'none';
       if (tg) tg.ready();
     } catch (e) {
       if (tg) tg.showAlert('Помилка мережі');
       else alert('Помилка мережі');
       submitBtn.disabled = false;
-      submitBtn.textContent = '✓ Підтвердити вибір';
+      submitBtn.textContent = 'Підтвердити';
     }
   }
 
-  submitBtn.addEventListener('click', submitMatches);
+  submitBtn.addEventListener('click', submitTwoTeams);
 
   (async function init() {
     try {
-      const data = await loadMatches();
-      if (data.matches && data.matches.length > 0) {
-        renderMatchList(data);
+      const data = await loadTeamsForRound();
+      if (data.teams && data.teams.length > 0) {
+        renderTeamList(data);
         return;
       }
-      contentEl.innerHTML = '<p class="info">Матчів для цього раунду поки немає. Оновіть сторінку пізніше, коли адмін їх додасть.</p>';
+      contentEl.innerHTML = '<p class="info">Команди для цього туру поки не додано. Оновіть сторінку пізніше.</p>';
       submitBtn.style.display = 'none';
+      counterEl.style.display = 'none';
       roundEl.style.display = 'none';
     } catch (e) {
       contentEl.innerHTML = '<p class="error">' + escapeHtml(e.message) + '</p>';
       submitBtn.style.display = 'none';
+      counterEl.style.display = 'none';
       roundEl.style.display = 'none';
     }
   })();

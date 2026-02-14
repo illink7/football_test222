@@ -53,6 +53,11 @@ class MatchSelectionSubmit(BaseModel):
     match_ids: list[int]
 
 
+class SubmitTwoTeams(BaseModel):
+    team1_id: int
+    team2_id: int
+
+
 class GameCreate(BaseModel):
     title: str
 
@@ -301,6 +306,87 @@ async def submit_match_selections(entry_id: int, body: MatchSelectionSubmit, db=
         db.add(EntryMatchSelection(entry_id=entry_id, match_id=mid))
     db.commit()
     return {"ok": True, "round": rnd, "selected_count": len(body.match_ids)}
+
+
+# ----- Pick 2 teams that will score (from round's team list) -----
+
+
+@app.get("/api/entry/{entry_id}/teams_for_round")
+async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
+    """List of teams playing this round (unique from matches). User must pick exactly 2 that will score."""
+    entry = db.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.status != "active":
+        raise HTTPException(status_code=400, detail="Entry is not active")
+    game = db.get(Game, entry.game_id)
+    if not game or game.status != "active":
+        raise HTTPException(status_code=400, detail="Game not active")
+    rnd = game.current_round
+    matches = (
+        db.execute(
+            select(Match)
+            .where(Match.game_id == game.id, Match.round == rnd)
+            .order_by(Match.id)
+        )
+        .scalars().all()
+    )
+    seen: set[int] = set()
+    teams_list: list[Team] = []
+    for m in matches:
+        for tid in (m.home_team_id, m.away_team_id):
+            if tid not in seen:
+                seen.add(tid)
+                t = db.get(Team, tid)
+                if t:
+                    teams_list.append(t)
+    return {
+        "entry_id": entry_id,
+        "round": rnd,
+        "teams": [TeamItem(id=t.id, name=t.name) for t in teams_list],
+    }
+
+
+@app.post("/api/entry/{entry_id}/submit_teams")
+async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_db)):
+    """Save user's choice of 2 teams that will score this round. Replaces any previous selection for this round."""
+    entry = db.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.status != "active":
+        raise HTTPException(status_code=400, detail="Entry is not active")
+    game = db.get(Game, entry.game_id)
+    if not game or game.status != "active":
+        raise HTTPException(status_code=400, detail="Game not active")
+    rnd = game.current_round
+    matches = (
+        db.execute(
+            select(Match).where(Match.game_id == game.id, Match.round == rnd)
+        )
+        .scalars().all()
+    )
+    allowed_ids: set[int] = set()
+    for m in matches:
+        allowed_ids.add(m.home_team_id)
+        allowed_ids.add(m.away_team_id)
+    if body.team1_id not in allowed_ids or body.team2_id not in allowed_ids:
+        raise HTTPException(status_code=400, detail="Обери дві команди зі списку цього туру")
+    if body.team1_id == body.team2_id:
+        raise HTTPException(status_code=400, detail="Обери дві різні команди")
+    existing = (
+        db.execute(
+            select(Selection).where(
+                Selection.entry_id == entry_id,
+                Selection.round == rnd,
+            )
+        )
+        .scalars().all()
+    )
+    for sel in existing:
+        db.delete(sel)
+    db.add(Selection(entry_id=entry_id, round=rnd, team1_id=body.team1_id, team2_id=body.team2_id))
+    db.commit()
+    return {"ok": True, "round": rnd}
 
 
 # ----- Admin API (require_admin) -----

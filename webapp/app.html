@@ -269,7 +269,7 @@
       const canPick = e.status === 'active';
       const link = canPick ? (webAppUrl + '?entry_id=' + e.entry_id) : '#';
       const cardClass = 'entry-card' + (canPick ? '' : ' disabled');
-      const ctaText = canPick ? 'Обрати матчі' : 'Чекайте результатів';
+      const ctaText = canPick ? 'Обрати команди' : 'Чекайте результатів';
       const ctaIcon = canPick ? '⚽' : '⏳';
       return '<a href="' + link + '" class="' + cardClass + '">' +
         '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
