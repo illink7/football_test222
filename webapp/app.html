@@ -83,7 +83,9 @@
     select { cursor: pointer; }
     .form-row { margin-bottom: 12px; }
     .form-row:last-child { margin-bottom: 0; }
+    .field-label { font-size: 0.85rem; opacity: 0.9; margin-bottom: 6px; display: block; }
     .hint { font-size: 0.8rem; opacity: 0.7; margin-top: 6px; }
+    .error-inline { color: #e94560; opacity: 1; }
     .admin-only { display: none; }
     .user-only { display: none; }
     body.admin .admin-only { display: block; }
@@ -148,14 +150,18 @@
         <h2 class="section-title">⚽ Додати матчі раунду</h2>
         <div class="card">
           <div class="form-row">
+            <label class="field-label">1. Оберіть гру</label>
             <select id="addMatchGameId"><option value="">— оберіть гру —</option></select>
           </div>
           <div class="form-row">
+            <label class="field-label">2. Номер раунду</label>
             <input type="number" id="addMatchRound" placeholder="Номер раунду" min="1" value="1" />
           </div>
           <div class="form-row">
-            <textarea id="addMatchText" rows="8" placeholder="Один матч на рядок у форматі: Дім — Гость&#10;&#10;Приклад:&#10;Вулвергемптон — Арсенал&#10;Борнмут — Манчестер Юнайтед&#10;Брайтон — Ліверпуль"></textarea>
+            <label class="field-label">3. Матчі (один на рядок: Дім — Гость)</label>
+            <textarea id="addMatchText" rows="8" placeholder="Вулвергемптон — Арсенал&#10;Борнмут — Манчестер Юнайтед&#10;Брайтон — Ліверпуль&#10;..."></textarea>
           </div>
+          <p id="addMatchError" class="hint error-inline" style="display:none;"></p>
           <button type="button" id="btnAddMatches" class="btn btn-success">Додати матчі</button>
           <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
         </div>
@@ -230,6 +236,10 @@
     const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
     document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     document.getElementById('addEntryGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
+    if (games.length === 1) {
+      document.getElementById('addMatchGameId').value = games[0].id;
+      document.getElementById('addEntryGameId').value = games[0].id;
+    }
   }
 
   function renderGamesList(games) {
@@ -285,19 +295,46 @@
   }
 
   async function addMatches() {
+    const errEl = document.getElementById('addMatchError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
     const gameId = document.getElementById('addMatchGameId').value;
     const round = parseInt(document.getElementById('addMatchRound').value, 10);
     const text = document.getElementById('addMatchText').value;
-    if (!gameId || !round) { if (tg) tg.showAlert('Оберіть гру та вкажіть раунд'); return; }
+    if (!gameId) {
+      errEl.textContent = 'Спочатку оберіть гру зі списку вище.';
+      errEl.style.display = 'block';
+      if (tg) tg.showAlert('Оберіть гру зі списку «Оберіть гру»');
+      return;
+    }
+    if (!round || round < 1) {
+      errEl.textContent = 'Вкажіть номер раунду (1, 2, 3...).';
+      errEl.style.display = 'block';
+      return;
+    }
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) { if (tg) tg.showAlert('Введіть хоча б один матч (рядок: Дім — Гость)'); return; }
+    if (!lines.length) {
+      errEl.textContent = 'Введіть хоча б один матч у форматі: Дім — Гость (один на рядок).';
+      errEl.style.display = 'block';
+      if (tg) tg.showAlert('Введіть матчі в текстове поле');
+      return;
+    }
     try {
       const r = await fetch(baseUrl + '/api/games/' + gameId + '/matches?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ round, matches: lines }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
       const added = data.added || 0;
-      if (tg) tg.showAlert('Додано матчів: ' + added);
-      document.getElementById('addMatchText').value = '';
+      const notFound = data.not_found || [];
+      if (notFound.length > 0) {
+        errEl.textContent = 'Не знайдено в базі (перевірте написання): ' + notFound.slice(0, 8).join(', ') + (notFound.length > 8 ? '…' : '');
+        errEl.style.display = 'block';
+      }
+      if (added > 0) {
+        if (tg) tg.showAlert('Додано матчів: ' + added + (notFound.length ? '. Частина не додалась — дивіться підказку під кнопкою.' : ''));
+        document.getElementById('addMatchText').value = '';
+      } else if (notFound.length === 0) {
+        if (tg) tg.showAlert('Нічого не додано. Перевірте формат: Дім — Гость на кожен рядок.');
+      }
       loadMe();
       if (added > 0) {
         const listR = await fetch(baseUrl + '/api/games/' + gameId + '/matches?round=' + round + '&' + qs());

@@ -5,7 +5,7 @@ Bot is started separately in main.py via asyncio.gather (same process).
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -90,6 +90,12 @@ def require_admin(uid: int = Depends(get_current_user)):
 
 
 # ----- Endpoints -----
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Avoid 404 in logs when browser requests favicon."""
+    return Response(status_code=204)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -341,22 +347,37 @@ async def api_add_matches(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     teams_list = db.execute(select(Team)).scalars().all()
-    teams_by_name = {t.name: t for t in teams_list}
+
+    def norm(s: str) -> str:
+        return s.replace("э", "е").replace("ё", "е").replace("і", "и").strip()
+
+    teams_by_name: dict[str, Team] = {}
+    for t in teams_list:
+        teams_by_name[t.name] = t
+        teams_by_name[norm(t.name)] = t
     added = 0
+    not_found: list[str] = []
     for line in body.matches:
         line = line.strip()
+        if not line:
+            continue
         for sep in (" — ", " - ", "–", "-"):
             if sep in line:
                 parts = line.split(sep, 1)
                 home_name, away_name = parts[0].strip(), parts[1].strip()
-                home = teams_by_name.get(home_name)
-                away = teams_by_name.get(away_name)
+                home = teams_by_name.get(home_name) or teams_by_name.get(norm(home_name))
+                away = teams_by_name.get(away_name) or teams_by_name.get(norm(away_name))
                 if home and away:
                     db.add(Match(game_id=game_id, round=body.round, home_team_id=home.id, away_team_id=away.id))
                     added += 1
+                else:
+                    if not home:
+                        not_found.append(home_name)
+                    if not away:
+                        not_found.append(away_name)
                 break
     db.commit()
-    return {"added": added}
+    return {"added": added, "not_found": list(dict.fromkeys(not_found))}
 
 
 @app.post("/api/entries")
