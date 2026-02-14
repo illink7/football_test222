@@ -1,7 +1,7 @@
 """
 Database package: engine, session, and model registration.
 """
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from config import DATABASE_URL
@@ -30,10 +30,22 @@ def get_db():
         db.close()
 
 
+def _ensure_entries_stake_column():
+    """Add entries.stake column if missing (migration for existing DBs)."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('entries') WHERE name='stake'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE entries ADD COLUMN stake INTEGER"))
+            conn.commit()
+
+
 def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
     Base.metadata.create_all(bind=engine)
+    _ensure_entries_stake_column()
 
 
 def seed_teams():
