@@ -100,6 +100,7 @@ def get_current_user(
 
 
 def require_admin(uid: int = Depends(get_current_user)):
+    """Тільки uid == ADMIN_ID (8386941234) має доступ до адмін-ендпоінтів; решта — юзери."""
     if uid != ADMIN_ID:
         raise HTTPException(status_code=403, detail="Admin only")
     return uid
@@ -134,7 +135,7 @@ async def select_teams_page():
 
 @app.get("/api/me")
 async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Return current user info, is_admin, entries. Requires init_data in query or header."""
+    """Повертає user_id, is_admin (True лише для 8386941234), entries. Решта юзерів — юзер-панель."""
     is_admin = uid == ADMIN_ID
     entries = (
         db.execute(

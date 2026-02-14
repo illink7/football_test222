@@ -220,6 +220,11 @@
   let initData = (tg && tg.initData) ? tg.initData : '';
 
   function qs() { return 'init_data=' + encodeURIComponent(initData); }
+  function authHeaders(extra = {}) {
+    const h = { ...extra };
+    if (initData) h['X-Telegram-Init-Data'] = initData;
+    return h;
+  }
 
   const loadingEl = document.getElementById('loading');
   const errorEl = document.getElementById('error');
@@ -318,9 +323,9 @@
       return;
     }
     try {
-      const r = await fetch(baseUrl + '/api/join_game?' + qs(), {
+      const r = await fetch(baseUrl + '/api/join_game', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ game_id: parseInt(gameId, 10), stake: stakeVal })
       });
       const data = await r.json().catch(() => ({}));
@@ -336,7 +341,7 @@
     const title = document.getElementById('newGameTitle').value.trim();
     if (!title) { if (tg) tg.showAlert('Введіть назву гри'); return; }
     try {
-      const r = await fetch(baseUrl + '/api/games?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+      const r = await fetch(baseUrl + '/api/games', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ title }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
       if (tg) tg.showAlert('Гру створено: ' + data.title);
@@ -373,7 +378,7 @@
       return;
     }
     try {
-      const r = await fetch(baseUrl + '/api/games/' + gameId + '/matches?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ round, matches: lines }) });
+      const r = await fetch(baseUrl + '/api/games/' + gameId + '/matches', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ round, matches: lines }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
       const added = data.added || 0;
@@ -390,7 +395,7 @@
       }
       loadMe();
       if (added > 0) {
-        const listR = await fetch(baseUrl + '/api/games/' + gameId + '/matches?round=' + round + '&' + qs());
+        const listR = await fetch(baseUrl + '/api/games/' + gameId + '/matches?round=' + round, { headers: authHeaders() });
         const listData = await listR.json().catch(() => []);
         const preview = document.getElementById('matchesAddedPreview');
         if (listR.ok && Array.isArray(listData) && listData.length > 0) {
@@ -414,7 +419,7 @@
     const body = { game_id: parseInt(gameId, 10) };
     if (userIdInput) body.user_id = parseInt(userIdInput, 10);
     try {
-      const r = await fetch(baseUrl + '/api/entries?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch(baseUrl + '/api/entries', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
       if (tg) tg.showAlert('Запис додано. Гравець зможе обрати матчі у своєму додатку.');
@@ -431,7 +436,7 @@
       return;
     }
     try {
-      const r = await fetch(baseUrl + '/api/me?' + qs());
+      const r = await fetch(baseUrl + '/api/me', { headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         const msg = data.detail || 'Помилка авторизації';
