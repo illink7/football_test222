@@ -147,22 +147,40 @@
       </section>
 
       <section class="section">
-        <h2 class="section-title">⚽ Додати матчі раунду</h2>
+        <h2 class="section-title">⚽ Задати команди та згенерувати 10 турів</h2>
         <div class="card">
           <div class="form-row">
             <label class="field-label">1. Оберіть гру</label>
+            <select id="setTeamsGameId"><option value="">— оберіть гру —</option></select>
+          </div>
+          <div class="form-row">
+            <label class="field-label">2. Список 20 команд (по одній на рядок)</label>
+            <textarea id="setTeamsText" rows="12" placeholder="Вулверхэмптон&#10;Арсенал&#10;Борнмут&#10;Ман Юнайтед&#10;Брайтон&#10;Ливерпуль&#10;Фулхэм&#10;Бернли&#10;Ман Сити&#10;Кристал Пэлас&#10;Эвертон&#10;Челси&#10;Лидс&#10;Брентфорд&#10;Ньюкасл&#10;Сандерленд&#10;Астон Вилла&#10;Вест Хэм&#10;Тоттенхэм&#10;Ноттингем Форест"></textarea>
+          </div>
+          <p class="hint">Система автоматично згенерує 10 турів по 10 матчів (пари тасуються кожен тур). Старі матчі гри будуть замінені.</p>
+          <p id="setTeamsError" class="hint error-inline" style="display:none;"></p>
+          <button type="button" id="btnSetTeams" class="btn btn-success">Згенерувати 10 турів</button>
+          <div id="setTeamsPreview" class="matches-preview" style="display:none;"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">📋 Додати матчі вручну (один раунд)</h2>
+        <div class="card">
+          <div class="form-row">
+            <label class="field-label">Гра</label>
             <select id="addMatchGameId"><option value="">— оберіть гру —</option></select>
           </div>
           <div class="form-row">
-            <label class="field-label">2. Номер раунду</label>
+            <label class="field-label">Номер раунду</label>
             <input type="number" id="addMatchRound" placeholder="Номер раунду" min="1" value="1" />
           </div>
           <div class="form-row">
-            <label class="field-label">3. Матчі (один на рядок: Дім — Гость)</label>
-            <textarea id="addMatchText" rows="8" placeholder="Вулвергемптон — Арсенал&#10;Борнмут — Манчестер Юнайтед&#10;Брайтон — Ліверпуль&#10;..."></textarea>
+            <label class="field-label">Матчі (один на рядок: Дім — Гость)</label>
+            <textarea id="addMatchText" rows="6" placeholder="Вулвергемптон — Арсенал&#10;Борнмут — Ман Юнайтед&#10;..."></textarea>
           </div>
           <p id="addMatchError" class="hint error-inline" style="display:none;"></p>
-          <button type="button" id="btnAddMatches" class="btn btn-success">Додати матчі</button>
+          <button type="button" id="btnAddMatches" class="btn btn-secondary">Додати матчі</button>
           <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
         </div>
       </section>
@@ -244,6 +262,7 @@
       fillGamesSelects(me.games || []);
       renderGamesList(me.games || []);
       document.getElementById('btnCreateGame').onclick = createGame;
+      document.getElementById('btnSetTeams').onclick = setTeams;
       document.getElementById('btnAddMatches').onclick = addMatches;
       document.getElementById('btnAddEntry').onclick = addEntry;
     } else {
@@ -268,9 +287,11 @@
 
   function fillGamesSelects(games) {
     const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
+    document.getElementById('setTeamsGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     document.getElementById('addEntryGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     if (games.length === 1) {
+      document.getElementById('setTeamsGameId').value = games[0].id;
       document.getElementById('addMatchGameId').value = games[0].id;
       document.getElementById('addEntryGameId').value = games[0].id;
     }
@@ -348,6 +369,46 @@
       document.getElementById('newGameTitle').value = '';
       loadMe();
     } catch (e) {
+      if (tg) tg.showAlert(e.message);
+    }
+  }
+
+  async function setTeams() {
+    const errEl = document.getElementById('setTeamsError');
+    const previewEl = document.getElementById('setTeamsPreview');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    previewEl.style.display = 'none';
+    const gameId = document.getElementById('setTeamsGameId').value;
+    const text = document.getElementById('setTeamsText').value;
+    if (!gameId) {
+      errEl.textContent = 'Оберіть гру зі списку вище.';
+      errEl.style.display = 'block';
+      if (tg) tg.showAlert('Оберіть гру');
+      return;
+    }
+    const team_names = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (team_names.length !== 20) {
+      errEl.textContent = 'Потрібно рівно 20 команд (по одній на рядок). Зараз: ' + team_names.length;
+      errEl.style.display = 'block';
+      if (tg) tg.showAlert('Введіть рівно 20 назв команд');
+      return;
+    }
+    try {
+      const r = await fetch(baseUrl + '/api/games/' + gameId + '/set_teams', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ team_names })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Помилка');
+      if (tg) tg.showAlert('Згенеровано 10 турів по 10 матчів. Старі матчі гри замінені.');
+      previewEl.style.display = 'block';
+      previewEl.innerHTML = '<div class="preview-title">Готово: 10 турів, у кожному по 10 матчів (пари змішані для кожного туру).</div>';
+      loadMe();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
       if (tg) tg.showAlert(e.message);
     }
   }

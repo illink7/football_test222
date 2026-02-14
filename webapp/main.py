@@ -85,6 +85,11 @@ class MatchesAdd(BaseModel):
     matches: list[str]  # each "Home — Away"
 
 
+class SetTeamsBody(BaseModel):
+    """Один список команд (назви по рядку). З нього генеруються 10 турів по 10 матчів (тасування пар)."""
+    team_names: list[str]  # 20 команд, по одній на рядок
+
+
 class EntryAdd(BaseModel):
     game_id: int
     user_id: int | None = None  # default = current user
@@ -369,7 +374,7 @@ async def submit_match_selections(entry_id: int, body: MatchSelectionSubmit, db=
 
 @app.get("/api/entry/{entry_id}/teams_for_round")
 async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
-    """List of teams playing this round (same teams every round; rounds 1..10)."""
+    """Команди поточного туру, без тих, що гравець вже вибирав у попередніх турах. + поточна ставка."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -379,6 +384,19 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
+    used_team_ids: set[int] = set()
+    prev = (
+        db.execute(
+            select(Selection.team1_id, Selection.team2_id).where(
+                Selection.entry_id == entry_id,
+                Selection.round < rnd,
+            )
+        )
+        .all()
+    )
+    for row in prev:
+        used_team_ids.add(row[0])
+        used_team_ids.add(row[1])
     matches = (
         db.execute(
             select(Match)
@@ -396,10 +414,13 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
                 t = db.get(Team, tid)
                 if t:
                     teams_list.append(t)
+    stake = entry.stake_amount if entry.stake_amount is not None else entry.stake
     return {
         "entry_id": entry_id,
         "round": rnd,
         "teams": [TeamItem(id=t.id, name=t.name) for t in teams_list],
+        "used_team_ids": list(used_team_ids),
+        "stake": float(stake) if stake is not None else None,
     }
 
 
@@ -425,8 +446,23 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     for m in matches:
         allowed_ids.add(m.home_team_id)
         allowed_ids.add(m.away_team_id)
+    used_team_ids: set[int] = set()
+    prev = (
+        db.execute(
+            select(Selection.team1_id, Selection.team2_id).where(
+                Selection.entry_id == entry_id,
+                Selection.round < rnd,
+            )
+        )
+        .all()
+    )
+    for row in prev:
+        used_team_ids.add(row[0])
+        used_team_ids.add(row[1])
     if body.team1_id not in allowed_ids or body.team2_id not in allowed_ids:
         raise HTTPException(status_code=400, detail="Обери дві команди зі списку цього туру")
+    if body.team1_id in used_team_ids or body.team2_id in used_team_ids:
+        raise HTTPException(status_code=400, detail="Не можна вибирати команди з минулих турів")
     if body.team1_id == body.team2_id:
         raise HTTPException(status_code=400, detail="Обери дві різні команди")
     existing = (
@@ -584,6 +620,68 @@ async def api_list_matches(
         {"id": m.id, "home": m.home_team.name, "away": m.away_team.name}
         for m in matches
     ]
+
+
+@app.post("/api/games/{game_id}/set_teams")
+async def api_set_teams(
+    game_id: int,
+    body: SetTeamsBody,
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Задати список команд і автоматично згенерувати 10 турів (тасування пар). Видаляє старі матчі гри."""
+    game = db.get(Game, game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    names = [n.strip() for n in body.team_names if n.strip()]
+    if len(names) != 20:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Потрібно рівно 20 команд (зараз {len(names)}). По одній назві на рядок.",
+        )
+    teams_list = db.execute(select(Team)).scalars().all()
+
+    def norm(s: str) -> str:
+        return s.replace("э", "е").replace("ё", "е").replace("і", "и").strip()
+
+    teams_by_name: dict[str, Team] = {}
+    for t in teams_list:
+        teams_by_name[t.name] = t
+        teams_by_name[norm(t.name)] = t
+    team_ids: list[int] = []
+    not_found: list[str] = []
+    for name in names:
+        t = teams_by_name.get(name) or teams_by_name.get(norm(name))
+        if t:
+            team_ids.append(t.id)
+        else:
+            not_found.append(name)
+    if not_found:
+        raise HTTPException(
+            status_code=400,
+            detail="Команди не знайдено (додайте їх у базу або перевірте написання): " + ", ".join(not_found[:5])
+            + (" …" if len(not_found) > 5 else ""),
+        )
+    existing = (
+        db.execute(select(Match).where(Match.game_id == game_id))
+        .scalars().all()
+    )
+    for m in existing:
+        db.delete(m)
+    for rnd in range(1, 11):
+        ids = list(team_ids)
+        random.shuffle(ids)
+        for i in range(0, 20, 2):
+            db.add(
+                Match(
+                    game_id=game_id,
+                    round=rnd,
+                    home_team_id=ids[i],
+                    away_team_id=ids[i + 1],
+                )
+            )
+    db.commit()
+    return {"ok": True, "rounds_created": 10, "matches_per_round": 10}
 
 
 @app.post("/api/games/{game_id}/matches")

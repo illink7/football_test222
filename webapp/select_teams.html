@@ -70,6 +70,8 @@
     }
     .team-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
     .team-row.selected .check { background: var(--success); border-color: var(--success); color: #1a1a2e; }
+    .team-row.used { background: rgba(233, 69, 96, 0.2); border-color: rgba(233, 69, 96, 0.5); cursor: not-allowed; opacity: 0.9; }
+    .team-row.used .name { opacity: 0.9; }
     .team-row .name { flex: 1; font-size: 1rem; }
     .counter { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; text-align: center; }
     .btn {
@@ -107,6 +109,8 @@
     .match-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 8px; background: var(--card-bg); border-radius: 10px; font-size: 0.95rem; }
     .match-score .score { font-weight: 600; margin: 0 8px; }
     .btn-next { margin-top: 20px; background: var(--success); color: #1a1a2e; }
+    .stake-line { font-size: 0.95rem; color: var(--success); font-weight: 600; margin-top: 8px; }
+    .stake-line .muted { font-weight: normal; opacity: 0.85; font-size: 0.85rem; }
   </style>
 </head>
 <body>
@@ -114,9 +118,10 @@
     <header class="header">
       <h1>⚽ Обрати команди</h1>
       <div class="round-badge" id="roundInfo">Тур —</div>
+      <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> грн <span class="muted">(×1.5 після кожного туру)</span></p>
     </header>
 
-    <p class="intro" id="intro">Виберіть дві команди, які заб'ють гол у цьому турі.</p>
+    <p class="intro" id="intro">Виберіть дві команди, які заб'ють гол у цьому турі. У наступних турах не можна вибирати вже використані команди.</p>
 
     <div id="content" class="content">
       <p class="loading">Завантаження…</p>
@@ -154,10 +159,18 @@
   }
 
   const roundEl = document.getElementById('roundInfo');
+  const stakeLineEl = document.getElementById('stakeLine');
+  const stakeValueEl = document.getElementById('stakeValue');
   const introEl = document.getElementById('intro');
   const contentEl = document.getElementById('content');
   const counterEl = document.getElementById('counter');
   const submitBtn = document.getElementById('submitBtn');
+
+  function formatStake(n) {
+    if (n == null || n === undefined) return '—';
+    const x = Number(n);
+    return x % 1 === 0 ? String(x) : x.toFixed(1);
+  }
 
   let teamsData = [];
   let selectedIds = [];
@@ -170,8 +183,15 @@
 
   function renderTeamList(data) {
     teamsData = data.teams || [];
+    const usedSet = new Set((data.used_team_ids || []).map(Number));
     roundEl.textContent = 'Тур ' + data.round;
     roundEl.style.display = 'inline-block';
+    if (data.stake != null) {
+      stakeValueEl.textContent = formatStake(data.stake);
+      stakeLineEl.style.display = 'block';
+    } else {
+      stakeLineEl.style.display = 'none';
+    }
 
     if (teamsData.length === 0) {
       contentEl.innerHTML = '<p class="info">Команди для цього туру ще не додано. Адмін додасть матчі — тоді з\'явиться список команд. Оновіть сторінку пізніше.</p>';
@@ -182,9 +202,11 @@
 
     selectedIds = [];
     const html = teamsData.map(t => {
-      return '<div class="team-row" data-team-id="' + t.id + '" role="button" tabindex="0">' +
+      const used = usedSet.has(t.id);
+      const cls = 'team-row' + (used ? ' used' : '');
+      return '<div class="' + cls + '" data-team-id="' + t.id + '" data-used="' + (used ? '1' : '0') + '" role="button" tabindex="0">' +
         '<span class="check"></span>' +
-        '<span class="name">' + escapeHtml(t.name) + '</span>' +
+        '<span class="name">' + escapeHtml(t.name) + (used ? ' (вже використовувалась)' : '') + '</span>' +
       '</div>';
     }).join('');
     contentEl.innerHTML = html;
@@ -195,6 +217,7 @@
 
     contentEl.querySelectorAll('.team-row').forEach(row => {
       row.addEventListener('click', function () {
+        if (this.dataset.used === '1') return;
         const id = parseInt(this.dataset.teamId, 10);
         const idx = selectedIds.indexOf(id);
         if (idx >= 0) {
@@ -245,6 +268,9 @@
     html += '<div class="icon">' + (passed ? '✅' : '❌') + '</div>';
     html += '<h2>' + (passed ? 'Ви проходите далі!' : 'Ви вибуваєте') + '</h2>';
     html += '<p class="message ' + (passed ? 'passed' : 'out') + '">' + escapeHtml(data.message || '') + '</p>';
+    if (data.stake_after_round != null) {
+      html += '<p class="stake-line">Ваша ставка тепер: <strong>' + formatStake(data.stake_after_round) + '</strong> грн</p>';
+    }
     if (data.matches && data.matches.length) {
       data.matches.forEach(function (m) {
         html += '<div class="match-score">' +
