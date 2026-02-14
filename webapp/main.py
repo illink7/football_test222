@@ -88,13 +88,13 @@ def get_current_user(
     if not init:
         raise HTTPException(
             status_code=401,
-            detail="Відкрийте додаток з чату бота Survivor Football (кнопка меню або /start), а не в браузері.",
+            detail="Відкрийте додаток з чату бота @PriceCalculatorNL_bot (кнопка меню або /start), а не в браузері.",
         )
     uid = get_user_id_from_init_data(init, BOT_TOKEN)
     if uid is None:
         raise HTTPException(
             status_code=401,
-            detail="Помилка перевірки: відкрийте додаток саме з бота Survivor Football. Якщо ви зайшли з іншого бота — авторизація не працюватиме.",
+            detail="Помилка перевірки: відкрийте додаток саме з бота @PriceCalculatorNL_bot. Якщо ви зайшли з іншого бота — авторизація не працюватиме.",
         )
     return uid
 

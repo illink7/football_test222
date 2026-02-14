@@ -427,7 +427,7 @@
 
   async function loadMe() {
     if (!initData) {
-      showError('Відкрийте додаток з чату бота Survivor Football (кнопка меню або /start), а не по прямому посиланню в браузері.');
+      showError('Відкрийте додаток з чату бота @PriceCalculatorNL_bot (кнопка меню або /start), а не по прямому посиланню в браузері.');
       return;
     }
     try {
@@ -435,7 +435,7 @@
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         const msg = data.detail || 'Помилка авторизації';
-        showError(msg + '\n\nВідкрийте додаток саме з бота Survivor Football. Якщо ви зайшли з іншого бота (наприклад price_calculation_bot) — авторизація не працюватиме.');
+        showError(msg + '\n\nВідкрийте додаток саме з бота @PriceCalculatorNL_bot. Якщо ви зайшли з іншого бота — авторизація не працюватиме.');
         return;
       }
       showContent(data);
