@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Survivor — Обрати матчі</title>
+  <title>Обрати матчі — Survivor Football</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
       --tg-theme-bg-color: #1a1a2e;
       --tg-theme-text-color: #eee;
-      --tg-theme-button-color: #16213e;
-      --tg-theme-button-text-color: #eee;
+      --tg-theme-button-color: #0f3460;
+      --accent: #e94560;
+      --success: #4ecca3;
+      --card-bg: rgba(255,255,255,0.06);
+      --card-border: rgba(255,255,255,0.12);
     }
     * { box-sizing: border-box; }
     body {
@@ -18,194 +21,226 @@
       background: var(--tg-theme-bg-color);
       color: var(--tg-theme-text-color);
       margin: 0;
-      padding: 16px;
+      padding: 0;
       min-height: 100vh;
     }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    .round { opacity: 0.8; font-size: 0.9rem; margin-bottom: 16px; }
-    .loading, .error { padding: 12px; text-align: center; }
-    .error { color: #f88; }
-    .info { color: #8cf; margin-bottom: 12px; }
-    .success-msg { color: #8f8; margin-top: 16px; }
-    .match-row {
-      display: block;
-      width: 100%;
-      padding: 12px 14px;
-      margin-bottom: 8px;
-      font-size: 0.95rem;
+    .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
+    .header {
       text-align: center;
-      background: rgba(255,255,255,0.06);
-      border: 2px solid rgba(255,255,255,0.15);
-      border-radius: 10px;
+      padding: 16px 0 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header h1 { font-size: 1.35rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .round-badge {
+      display: inline-block;
+      font-size: 0.85rem;
+      opacity: 0.85;
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: var(--card-bg);
+      border-radius: 20px;
+    }
+    .content { padding: 20px 0; }
+    .loading { text-align: center; padding: 40px 20px; opacity: 0.9; }
+    .error { color: #e94560; padding: 16px; text-align: center; background: rgba(233,69,96,0.1); border-radius: 12px; margin-bottom: 16px; }
+    .info { color: #8cf; padding: 16px; text-align: center; line-height: 1.5; }
+    .match-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 14px;
       cursor: pointer;
       transition: background 0.2s, border-color 0.2s;
     }
-    .match-row:hover { background: rgba(255,255,255,0.1); }
+    .match-row:active { opacity: 0.95; }
     .match-row.selected {
-      background: rgba(76, 175, 80, 0.35);
-      border-color: #4CAF50;
+      background: rgba(78, 204, 163, 0.2);
+      border-color: var(--success);
     }
-    .match-row .vs { opacity: 0.7; margin: 0 6px; }
-    select {
+    .match-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .match-row.selected .check { background: var(--success); border-color: var(--success); color: #1a1a2e; }
+    .match-row .teams { flex: 1; text-align: center; font-size: 0.95rem; }
+    .match-row .vs { opacity: 0.6; margin: 0 6px; font-size: 0.9rem; }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       width: 100%;
-      padding: 12px;
-      margin-bottom: 12px;
-      font-size: 1rem;
-      background: var(--tg-theme-button-color);
-      color: var(--tg-theme-text-color);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
-    }
-    option { background: #1a1a2e; color: #eee; }
-    button {
-      width: 100%;
-      padding: 14px;
-      font-size: 1rem;
-      background: var(--tg-theme-button-color);
-      color: var(--tg-theme-button-text-color);
+      padding: 16px 20px;
+      font-size: 1.05rem;
+      font-weight: 600;
       border: none;
-      border-radius: 8px;
-      margin-top: 12px;
+      border-radius: 14px;
       cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.2s, transform 0.05s;
     }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .summary-list { text-align: left; margin: 12px 0; padding-left: 16px; }
+    .btn:active { transform: scale(0.98); }
+    .btn-success { background: var(--success); color: #1a1a2e; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .success-screen { text-align: center; padding: 32px 20px; }
+    .success-screen .icon { font-size: 3rem; margin-bottom: 16px; }
+    .success-screen h2 { font-size: 1.25rem; margin: 0 0 20px; }
+    .summary-list { text-align: left; margin: 16px 0; padding-left: 20px; line-height: 1.8; }
+    .success-screen .wait { color: var(--success); font-weight: 500; margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1 id="title">Обрати матчі</h1>
-  <p class="round" id="roundInfo">Раунд —</p>
-  <div id="content">
-    <p class="loading">Завантаження…</p>
+  <div class="container">
+    <header class="header">
+      <h1>⚽ Обрати матчі</h1>
+      <div class="round-badge" id="roundInfo">Раунд —</div>
+    </header>
+
+    <div id="content" class="content">
+      <p class="loading">Завантаження матчів…</p>
+    </div>
+
+    <button type="button" id="submitBtn" class="btn btn-success" disabled style="display:none;">
+      ✓ Підтвердити вибір
+    </button>
   </div>
-  <button type="button" id="submitBtn" disabled>Підтвердити</button>
 
   <script>
-    (function () {
-      const tg = window.Telegram?.WebApp;
-      if (tg) tg.ready();
+(function () {
+  const tg = window.Telegram?.WebApp;
+  if (tg) tg.ready();
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const entryId = urlParams.get('entry_id');
-      const baseUrl = window.location.origin;
+  const urlParams = new URLSearchParams(window.location.search);
+  const entryId = urlParams.get('entry_id');
+  const baseUrl = window.location.origin;
 
-      function escapeHtml(s) {
-        const div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
-      }
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
 
-      if (!entryId) {
-        document.getElementById('content').innerHTML =
-          '<p class="info">Survivor Football</p>' +
-          '<p>Надішли боту команду <b>/start</b> — там з\'явиться кнопка «Обрати команди» для твого entry.</p>' +
-          '<p>Якщо записів ще немає, адмін має створити гру та додати тобі entry.</p>';
-        document.getElementById('roundInfo').textContent = '';
-        document.getElementById('submitBtn').style.display = 'none';
+  if (!entryId) {
+    document.getElementById('content').innerHTML =
+      '<p class="info">Відкрийте додаток з головного меню бота — там будуть ваші записи та кнопка «Обрати матчі».</p>' +
+      '<p class="info">Якщо записів немає, адмін додасть вас у гру.</p>';
+    document.getElementById('roundInfo').style.display = 'none';
+    document.getElementById('submitBtn').style.display = 'none';
+    return;
+  }
+
+  const roundEl = document.getElementById('roundInfo');
+  const contentEl = document.getElementById('content');
+  const submitBtn = document.getElementById('submitBtn');
+
+  let matchesData = [];
+  let selectedMatchIds = new Set();
+
+  async function loadMatches() {
+    const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches');
+    if (!r.ok) throw new Error('Не вдалося завантажити матчі');
+    return r.json();
+  }
+
+  function renderMatchList(data) {
+    matchesData = data.matches || [];
+    selectedMatchIds = new Set(matchesData.filter(m => m.selected).map(m => m.id));
+    roundEl.textContent = 'Раунд ' + data.round;
+    roundEl.style.display = 'inline-block';
+
+    if (matchesData.length === 0) {
+      contentEl.innerHTML = '<p class="info">Матчів для цього раунду ще немає. Адмін незабаром їх додасть — оновіть сторінку пізніше.</p>';
+      submitBtn.style.display = 'none';
+      return;
+    }
+
+    const html = matchesData.map(m => {
+      const selected = selectedMatchIds.has(m.id);
+      const checkIcon = selected ? '✓' : '';
+      return '<div class="match-row' + (selected ? ' selected' : '') + '" data-match-id="' + m.id + '" role="button" tabindex="0">' +
+        '<span class="check">' + checkIcon + '</span>' +
+        '<span class="teams">' + escapeHtml(m.home_name) + '<span class="vs">—</span>' + escapeHtml(m.away_name) + '</span>' +
+      '</div>';
+    }).join('');
+    contentEl.innerHTML = html;
+    submitBtn.style.display = 'block';
+    submitBtn.disabled = false;
+
+    contentEl.querySelectorAll('.match-row').forEach(row => {
+      row.addEventListener('click', function () {
+        const id = parseInt(this.dataset.matchId, 10);
+        if (selectedMatchIds.has(id)) selectedMatchIds.delete(id);
+        else selectedMatchIds.add(id);
+        this.classList.toggle('selected', selectedMatchIds.has(id));
+        this.querySelector('.check').textContent = selectedMatchIds.has(id) ? '✓' : '';
+      });
+    });
+  }
+
+  async function submitMatches() {
+    const ids = Array.from(selectedMatchIds);
+    if (ids.length === 0) {
+      if (tg) tg.showAlert('Оберіть хоча б один матч');
+      else alert('Оберіть хоча б один матч');
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Збереження…';
+    try {
+      const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry_id: parseInt(entryId, 10), match_ids: ids })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (tg) tg.showAlert(data.detail || 'Помилка збереження');
+        else alert(data.detail || 'Помилка збереження');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✓ Підтвердити вибір';
         return;
       }
+      const names = matchesData.filter(m => ids.includes(m.id))
+        .map(m => m.home_name + ' — ' + m.away_name);
+      contentEl.innerHTML =
+        '<div class="success-screen">' +
+          '<div class="icon">✅</div>' +
+          '<h2>Готово</h2>' +
+          '<p>Ви обрали матчі:</p>' +
+          '<ul class="summary-list">' + names.map(n => '<li>' + escapeHtml(n) + '</li>').join('') + '</ul>' +
+          '<p class="wait">Чекайте результатів</p>' +
+        '</div>';
+      submitBtn.style.display = 'none';
+      roundEl.style.display = 'none';
+      if (tg) tg.ready();
+    } catch (e) {
+      if (tg) tg.showAlert('Помилка мережі');
+      else alert('Помилка мережі');
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✓ Підтвердити вибір';
+    }
+  }
 
-      const titleEl = document.getElementById('title');
-      const roundEl = document.getElementById('roundInfo');
-      const contentEl = document.getElementById('content');
-      const submitBtn = document.getElementById('submitBtn');
+  submitBtn.addEventListener('click', submitMatches);
 
-      let matchesData = [];
-      let selectedMatchIds = new Set();
-
-      async function loadMatches() {
-        const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches');
-        if (!r.ok) throw new Error('Не вдалося завантажити матчі');
-        return r.json();
+  (async function init() {
+    try {
+      const data = await loadMatches();
+      if (data.matches && data.matches.length > 0) {
+        renderMatchList(data);
+        return;
       }
-
-      function renderMatchList(data) {
-        matchesData = data.matches || [];
-        selectedMatchIds = new Set(matchesData.filter(m => m.selected).map(m => m.id));
-        roundEl.textContent = 'Раунд ' + data.round;
-
-        if (matchesData.length === 0) {
-          contentEl.innerHTML = '<p class="info">Матчів для цього раунду ще немає. Адмін додасть їх командою /add_matches.</p>';
-          submitBtn.style.display = 'none';
-          return;
-        }
-
-        const html = matchesData.map(m => {
-          const cls = selectedMatchIds.has(m.id) ? 'match-row selected' : 'match-row';
-          return '<div class="' + cls + '" data-match-id="' + m.id + '" role="button" tabindex="0">' +
-            escapeHtml(m.home_name) + '<span class="vs">—</span>' + escapeHtml(m.away_name) + '</div>';
-        }).join('');
-        contentEl.innerHTML = html;
-
-        contentEl.querySelectorAll('.match-row').forEach(row => {
-          row.addEventListener('click', function () {
-            const id = parseInt(this.dataset.matchId, 10);
-            if (selectedMatchIds.has(id)) selectedMatchIds.delete(id);
-            else selectedMatchIds.add(id);
-            this.classList.toggle('selected', selectedMatchIds.has(id));
-          });
-        });
-
-        submitBtn.textContent = 'Підтвердити';
-        submitBtn.style.display = 'block';
-        submitBtn.disabled = false;
-      }
-
-      async function submitMatches() {
-        const ids = Array.from(selectedMatchIds);
-        if (ids.length === 0) {
-          if (tg) tg.showAlert('Оберіть хоча б один матч.');
-          else alert('Оберіть хоча б один матч.');
-          return;
-        }
-        submitBtn.disabled = true;
-        try {
-          const r = await fetch(baseUrl + '/api/entry/' + entryId + '/matches', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entry_id: parseInt(entryId, 10), match_ids: ids })
-          });
-          const data = await r.json().catch(() => ({}));
-          if (!r.ok) {
-            if (tg) tg.showAlert(data.detail || 'Помилка збереження.');
-            else alert(data.detail || 'Помилка збереження.');
-            submitBtn.disabled = false;
-            return;
-          }
-          const names = matchesData.filter(m => ids.includes(m.id))
-            .map(m => m.home_name + ' — ' + m.away_name);
-          contentEl.innerHTML =
-            '<p class="success-msg">Ви обрали:</p>' +
-            '<ul class="summary-list">' + names.map(n => '<li>' + escapeHtml(n) + '</li>').join('') + '</ul>' +
-            '<p class="success-msg">Чекайте результатів.</p>';
-          submitBtn.style.display = 'none';
-          roundEl.textContent = '';
-          titleEl.textContent = 'Готово';
-          if (tg) tg.ready();
-        } catch (e) {
-          if (tg) tg.showAlert('Помилка мережі.');
-          else alert('Помилка мережі.');
-          submitBtn.disabled = false;
-        }
-      }
-
-      submitBtn.addEventListener('click', submitMatches);
-
-      (async function init() {
-        try {
-          const data = await loadMatches();
-          if (data.matches && data.matches.length > 0) {
-            renderMatchList(data);
-            return;
-          }
-          contentEl.innerHTML = '<p class="info">Матчів для цього раунду немає. Скоро з\'являться або оберіть 2 команди (старий режим).</p>';
-          submitBtn.style.display = 'none';
-        } catch (e) {
-          contentEl.innerHTML = '<p class="error">' + escapeHtml(e.message) + '</p>';
-          submitBtn.style.display = 'none';
-        }
-      })();
-    })();
+      contentEl.innerHTML = '<p class="info">Матчів для цього раунду поки немає. Оновіть сторінку пізніше, коли адмін їх додасть.</p>';
+      submitBtn.style.display = 'none';
+      roundEl.style.display = 'none';
+    } catch (e) {
+      contentEl.innerHTML = '<p class="error">' + escapeHtml(e.message) + '</p>';
+      submitBtn.style.display = 'none';
+      roundEl.style.display = 'none';
+    }
+  })();
+})();
   </script>
 </body>
 </html>

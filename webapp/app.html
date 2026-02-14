@@ -9,71 +9,179 @@
     :root {
       --tg-theme-bg-color: #1a1a2e;
       --tg-theme-text-color: #eee;
-      --tg-theme-button-color: #16213e;
+      --tg-theme-button-color: #0f3460;
       --tg-theme-button-text-color: #eee;
+      --accent: #e94560;
+      --success: #4ecca3;
+      --card-bg: rgba(255,255,255,0.06);
+      --card-border: rgba(255,255,255,0.12);
     }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); margin: 0; padding: 16px; min-height: 100vh; }
-    h1 { font-size: 1.25rem; margin: 0 0 16px; }
-    .loading { padding: 24px; text-align: center; }
-    .error { color: #f88; padding: 12px; }
-    .section { margin-bottom: 24px; }
-    .section h2 { font-size: 1rem; margin: 0 0 8px; opacity: 0.9; }
-    input, textarea, button, select {
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tg-theme-bg-color);
+      color: var(--tg-theme-text-color);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
+    .header {
+      text-align: center;
+      padding: 20px 0 24px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header h1 { font-size: 1.5rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .header .sub { font-size: 0.85rem; opacity: 0.7; margin-top: 6px; }
+    .loading { padding: 40px 24px; text-align: center; font-size: 1rem; opacity: 0.9; }
+    .error { background: rgba(233,69,96,0.15); color: #e94560; padding: 16px; border-radius: 12px; margin: 16px; text-align: center; }
+    .section {
+      margin: 24px 0;
+    }
+    .section-title {
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+      opacity: 0.85; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card:last-child { margin-bottom: 0; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       width: 100%;
-      padding: 12px;
-      margin-bottom: 8px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.05s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); }
+    .btn-success { background: var(--success); color: #1a1a2e; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    input, textarea, select {
+      width: 100%;
+      padding: 14px 16px;
+      margin-bottom: 12px;
       font-size: 1rem;
       background: rgba(255,255,255,0.08);
       color: var(--tg-theme-text-color);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
     }
-    button { background: var(--tg-theme-button-color); cursor: pointer; border: none; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .card { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-    .card a { color: #6af; text-decoration: none; }
-    .card a:active { opacity: 0.8; }
-    .badge { font-size: 0.75rem; opacity: 0.8; margin-left: 8px; }
+    input::placeholder, textarea::placeholder { opacity: 0.6; }
+    select { cursor: pointer; }
+    .form-row { margin-bottom: 12px; }
+    .form-row:last-child { margin-bottom: 0; }
+    .hint { font-size: 0.8rem; opacity: 0.7; margin-top: 6px; }
     .admin-only { display: none; }
     .user-only { display: none; }
     body.admin .admin-only { display: block; }
     body.user .user-only { display: block; }
+    .entry-card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      margin-bottom: 12px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .entry-card:active { background: rgba(255,255,255,0.1); }
+    .entry-card .game-name { font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; }
+    .entry-card .meta { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; }
+    .entry-card .cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--success); font-weight: 500; font-size: 0.95rem;
+    }
+    .entry-card.disabled .cta { color: var(--tg-theme-text-color); opacity: 0.7; }
+    .game-card-admin { padding: 14px 16px; }
+    .game-card-admin .name { font-weight: 600; margin-bottom: 4px; }
+    .game-card-admin .meta { font-size: 0.8rem; opacity: 0.75; }
+    .matches-preview {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--card-border);
+    }
+    .matches-preview .preview-title { font-size: 0.8rem; opacity: 0.8; margin-bottom: 8px; }
+    .match-line { font-size: 0.9rem; padding: 4px 0; opacity: 0.95; }
+    .expand-toggle { font-size: 0.85rem; color: var(--accent); cursor: pointer; margin-top: 8px; }
   </style>
 </head>
 <body>
-  <h1>Survivor Football</h1>
-  <div id="loading" class="loading">Завантаження…</div>
-  <div id="error" class="error" style="display:none;"></div>
-  <div id="admin" class="admin-only">
-    <div class="section">
-      <h2>Створити гру</h2>
-      <input type="text" id="newGameTitle" placeholder="Назва гри" />
-      <button type="button" id="btnCreateGame">Створити</button>
+  <div class="container">
+    <header class="header">
+      <h1>⚽ Survivor Football</h1>
+      <p class="sub">Оберіть матчі та чекайте результатів</p>
+    </header>
+
+    <div id="loading" class="loading">Завантаження…</div>
+    <div id="error" class="error" style="display:none;"></div>
+
+    <div id="admin" class="admin-only">
+      <section class="section">
+        <h2 class="section-title">🏆 Нова гра</h2>
+        <div class="card">
+          <input type="text" id="newGameTitle" placeholder="Назва гри (наприклад: Прем'єр-ліга)" />
+          <button type="button" id="btnCreateGame" class="btn btn-primary">Створити гру</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">🎮 Ваші ігри</h2>
+        <div id="gamesList"></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">⚽ Додати матчі раунду</h2>
+        <div class="card">
+          <div class="form-row">
+            <select id="addMatchGameId"><option value="">— оберіть гру —</option></select>
+          </div>
+          <div class="form-row">
+            <input type="number" id="addMatchRound" placeholder="Номер раунду" min="1" value="1" />
+          </div>
+          <div class="form-row">
+            <textarea id="addMatchText" rows="8" placeholder="Один матч на рядок у форматі: Дім — Гость&#10;&#10;Приклад:&#10;Вулвергемптон — Арсенал&#10;Борнмут — Манчестер Юнайтед&#10;Брайтон — Ліверпуль"></textarea>
+          </div>
+          <button type="button" id="btnAddMatches" class="btn btn-success">Додати матчі</button>
+          <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">👤 Додати учасника в гру</h2>
+        <div class="card">
+          <div class="form-row">
+            <select id="addEntryGameId"><option value="">— оберіть гру —</option></select>
+          </div>
+          <div class="form-row">
+            <input type="number" id="addEntryUserId" placeholder="Залиште порожнім — додасться вам (адміну)" />
+            <p class="hint">Щоб додати іншого гравця — він має написати боту /start; потім ви можете додати його за цим полем (ID). Або просто додайте себе і надішліть посилання на бота.</p>
+          </div>
+          <button type="button" id="btnAddEntry" class="btn btn-secondary">Додати запис</button>
+        </div>
+      </section>
     </div>
-    <div class="section">
-      <h2>Ігри</h2>
-      <div id="gamesList"></div>
-    </div>
-    <div class="section">
-      <h2>Додати матчі до раунду</h2>
-      <select id="addMatchGameId"><option value="">— оберіть гру —</option></select>
-      <input type="number" id="addMatchRound" placeholder="Номер раунду" min="1" value="1" />
-      <textarea id="addMatchText" rows="6" placeholder="Один матч на рядок: Дім — Гость&#10;Наприклад:&#10;Вулвергемптон — Арсенал&#10;Борнмут — Манчестер Юнайтед"></textarea>
-      <button type="button" id="btnAddMatches">Додати матчі</button>
-    </div>
-    <div class="section">
-      <h2>Додати entry учаснику</h2>
-      <select id="addEntryGameId"><option value="">— оберіть гру —</option></select>
-      <input type="number" id="addEntryUserId" placeholder="Telegram ID (порожньо = ви)" />
-      <button type="button" id="btnAddEntry">Додати entry</button>
-    </div>
-  </div>
-  <div id="user" class="user-only">
-    <div class="section">
-      <h2>Мої записи</h2>
-      <div id="entriesList"></div>
-      <p class="badge">Якщо записів немає — адмін має додати вам entry.</p>
+
+    <div id="user" class="user-only">
+      <section class="section">
+        <h2 class="section-title">📋 Мої записи</h2>
+        <div id="entriesList"></div>
+        <p class="hint">Якщо записів немає — адмін додасть вас у гру. Напишіть боту /start і з’явиться кнопка для відкриття додатку.</p>
+      </section>
     </div>
   </div>
 
@@ -83,15 +191,12 @@
   if (tg) tg.ready();
 
   const baseUrl = window.location.origin;
-  let initData = '';
-  if (tg && tg.initData) initData = tg.initData;
+  let initData = (tg && tg.initData) ? tg.initData : '';
 
-  function qs(p) { return 'init_data=' + encodeURIComponent(initData); }
+  function qs() { return 'init_data=' + encodeURIComponent(initData); }
 
   const loadingEl = document.getElementById('loading');
   const errorEl = document.getElementById('error');
-  const adminEl = document.getElementById('admin');
-  const userEl = document.getElementById('user');
 
   function showError(msg) {
     errorEl.textContent = msg;
@@ -115,36 +220,53 @@
     }
   }
 
-  function fillGamesSelects(games) {
-    const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' (id=' + g.id + ', раунд ' + g.current_round + ')</option>').join('');
-    document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
-    document.getElementById('addEntryGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
-  }
-
   function escapeHtml(s) {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
   }
 
+  function fillGamesSelects(games) {
+    const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
+    document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
+    document.getElementById('addEntryGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
+  }
+
   function renderGamesList(games) {
-    const html = games.length
-      ? games.map(g => '<div class="card">' + escapeHtml(g.title) + ' <span class="badge">id=' + g.id + ', раунд ' + g.current_round + '/' + g.rounds_total + ', ' + g.status + '</span></div>').join('')
-      : '<p class="badge">Ігор поки немає. Створіть гру вище.</p>';
-    document.getElementById('gamesList').innerHTML = html;
+    const el = document.getElementById('gamesList');
+    if (!games.length) {
+      el.innerHTML = '<div class="card game-card-admin"><span class="meta">Ігор поки немає. Створіть гру вище.</span></div>';
+      fillGamesSelects(games);
+      return;
+    }
+    el.innerHTML = games.map(g =>
+      '<div class="card game-card-admin">' +
+        '<div class="name">' + escapeHtml(g.title) + '</div>' +
+        '<div class="meta">Раунд ' + g.current_round + ' з ' + g.rounds_total + ' · ' + g.status + '</div>' +
+      '</div>'
+    ).join('');
     fillGamesSelects(games);
   }
 
   function renderEntriesList(entries) {
     const webAppUrl = baseUrl + '/select_teams';
-    const html = entries.length
-      ? entries.map(e => {
-          const canPick = e.status === 'active';
-          const link = canPick ? (webAppUrl + '?entry_id=' + e.entry_id) : '#';
-          return '<div class="card">' + escapeHtml(e.game_title) + ' <span class="badge">раунд ' + e.current_round + '/' + e.rounds_total + ', ' + e.status + '</span><br><a href="' + link + '">' + (canPick ? 'Обрати матчі' : 'Чекайте результатів') + '</a></div>';
-        }).join('')
-      : '<p class="badge">У вас ще немає записів. Адмін додасть entry для вас.</p>';
-    document.getElementById('entriesList').innerHTML = html;
+    const el = document.getElementById('entriesList');
+    if (!entries.length) {
+      el.innerHTML = '<p class="hint">У вас ще немає записів. Адмін додасть вас у гру.</p>';
+      return;
+    }
+    el.innerHTML = entries.map(e => {
+      const canPick = e.status === 'active';
+      const link = canPick ? (webAppUrl + '?entry_id=' + e.entry_id) : '#';
+      const cardClass = 'entry-card' + (canPick ? '' : ' disabled');
+      const ctaText = canPick ? 'Обрати матчі' : 'Чекайте результатів';
+      const ctaIcon = canPick ? '⚽' : '⏳';
+      return '<a href="' + link + '" class="' + cardClass + '">' +
+        '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
+        '<div class="meta">Раунд ' + e.current_round + ' з ' + e.rounds_total + '</div>' +
+        '<span class="cta">' + ctaIcon + ' ' + ctaText + '</span>' +
+      '</a>';
+    }).join('');
   }
 
   async function createGame() {
@@ -166,16 +288,30 @@
     const gameId = document.getElementById('addMatchGameId').value;
     const round = parseInt(document.getElementById('addMatchRound').value, 10);
     const text = document.getElementById('addMatchText').value;
-    if (!gameId || !round) { if (tg) tg.showAlert('Оберіть гру та раунд'); return; }
+    if (!gameId || !round) { if (tg) tg.showAlert('Оберіть гру та вкажіть раунд'); return; }
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (!lines.length) { if (tg) tg.showAlert('Введіть хоча б один матч (Дім — Гость)'); return; }
+    if (!lines.length) { if (tg) tg.showAlert('Введіть хоча б один матч (рядок: Дім — Гость)'); return; }
     try {
       const r = await fetch(baseUrl + '/api/games/' + gameId + '/matches?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ round, matches: lines }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Додано матчів: ' + (data.added || 0));
+      const added = data.added || 0;
+      if (tg) tg.showAlert('Додано матчів: ' + added);
       document.getElementById('addMatchText').value = '';
       loadMe();
+      if (added > 0) {
+        const listR = await fetch(baseUrl + '/api/games/' + gameId + '/matches?round=' + round + '&' + qs());
+        const listData = await listR.json().catch(() => []);
+        const preview = document.getElementById('matchesAddedPreview');
+        if (listR.ok && Array.isArray(listData) && listData.length > 0) {
+          preview.style.display = 'block';
+          preview.innerHTML = '<div class="preview-title">Матчі цього раунду (відображаються гравцям):</div>' +
+            listData.map(m => '<div class="match-line">' + escapeHtml(m.home) + ' — ' + escapeHtml(m.away) + '</div>').join('');
+        } else {
+          preview.style.display = 'block';
+          preview.innerHTML = '<div class="preview-title">Додано ' + added + ' матчів. Вони з’являться у виборі гравців.</div>';
+        }
+      }
     } catch (e) {
       if (tg) tg.showAlert(e.message);
     }
@@ -191,7 +327,7 @@
       const r = await fetch(baseUrl + '/api/entries?' + qs(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Entry #' + data.entry_id + ' додано');
+      if (tg) tg.showAlert('Запис додано. Гравець зможе обрати матчі у своєму додатку.');
       document.getElementById('addEntryUserId').value = '';
       loadMe();
     } catch (e) {
