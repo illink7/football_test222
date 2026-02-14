@@ -484,7 +484,7 @@ async def run_round(entry_id: int, db=Depends(get_db)):
     )
     if not sel_row:
         raise HTTPException(status_code=400, detail="Спочатку обери дві команди для цього туру")
-    selection = sel_row[0]
+    selection = sel_row
     matches = (
         db.execute(
             select(Match)
