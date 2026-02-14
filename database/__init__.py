@@ -47,7 +47,7 @@ def seed_teams():
         "Сандерленд", "Астон Вилла", "Вест Хэм", "Тоттенхэм", "Ноттингем Форест",
     ]
     with SessionLocal() as db:
-        existing = {r[0] for r in db.execute(select(Team.name)).scalars().all()}
+        existing = set(db.execute(select(Team.name)).scalars().all())
         for name in teams:
             if name not in existing:
                 db.add(Team(name=name))
