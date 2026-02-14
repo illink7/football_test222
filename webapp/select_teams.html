@@ -109,6 +109,13 @@
     .match-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 8px; background: var(--card-bg); border-radius: 10px; font-size: 0.95rem; }
     .match-score .score { font-weight: 600; margin: 0 8px; }
     .btn-next { margin-top: 20px; background: var(--success); color: #1a1a2e; }
+    .btn-row { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+    .btn-row .btn { margin-top: 0; }
+    .btn-outline { background: transparent; border: 2px solid var(--success); color: var(--success); }
+    .win-screen { text-align: center; padding: 28px 20px; }
+    .win-screen .icon { font-size: 3rem; margin-bottom: 12px; }
+    .win-screen h2 { font-size: 1.25rem; margin: 0 0 8px; }
+    .win-screen .amount { font-size: 1.5rem; font-weight: 700; color: var(--success); margin: 16px 0; }
     .stake-line { font-size: 0.95rem; color: var(--success); font-weight: 600; margin-top: 8px; }
     .stake-line .muted { font-weight: normal; opacity: 0.85; font-size: 0.85rem; }
   </style>
@@ -262,6 +269,10 @@
     tick();
   }
 
+  function goToMainMenu() {
+    window.location.href = baseUrl + '/';
+  }
+
   function showResultsScreen(data) {
     const passed = data.passed === true;
     let html = '<div class="results-screen">';
@@ -281,7 +292,12 @@
       });
     }
     if (passed) {
-      html += '<button type="button" class="btn btn-success btn-next" id="btnNextRound">Обрати команди для наступного туру</button>';
+      html += '<div class="btn-row">';
+      html += '<button type="button" class="btn btn-success" id="btnNextRound">Продовжити далі</button>';
+      html += '<button type="button" class="btn btn-outline" id="btnCashOut">Забрати виграш</button>';
+      html += '</div>';
+    } else {
+      html += '<button type="button" class="btn btn-success btn-next" id="btnMainMenuOut">Повернутися на головне меню</button>';
     }
     html += '</div>';
     contentEl.innerHTML = html;
@@ -290,6 +306,34 @@
       btnNext.addEventListener('click', function () {
         window.location.reload();
       });
+    }
+    const btnCashOut = document.getElementById('btnCashOut');
+    if (btnCashOut) {
+      btnCashOut.addEventListener('click', function () {
+        btnCashOut.disabled = true;
+        fetch(baseUrl + '/api/entry/' + entryId + '/cash_out', { method: 'POST' })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            const amount = res.amount != null ? formatStake(res.amount) : '0';
+            contentEl.innerHTML =
+              '<div class="results-screen win-screen">' +
+                '<div class="icon">🏆</div>' +
+                '<h2>Ви виграли!</h2>' +
+                '<p class="amount">' + amount + ' грн</p>' +
+                '<p class="message passed">Ви забрали виграш. Дякуємо за гру!</p>' +
+                '<button type="button" class="btn btn-success btn-next" id="btnMainMenuWin">На головне меню</button>' +
+              '</div>';
+            document.getElementById('btnMainMenuWin').addEventListener('click', goToMainMenu);
+          })
+          .catch(function () {
+            if (tg) tg.showAlert('Помилка. Спробуйте ще раз.');
+            btnCashOut.disabled = false;
+          });
+      });
+    }
+    const btnMainMenuOut = document.getElementById('btnMainMenuOut');
+    if (btnMainMenuOut) {
+      btnMainMenuOut.addEventListener('click', goToMainMenu);
     }
   }
 

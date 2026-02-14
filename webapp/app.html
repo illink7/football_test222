@@ -184,19 +184,6 @@
           <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
         </div>
       </section>
-
-      <section class="section">
-        <h2 class="section-title">👤 Додати учасника в гру</h2>
-        <div class="card">
-          <div class="form-row">
-            <select id="addEntryGameId"><option value="">— оберіть гру —</option></select>
-          </div>
-          <div class="form-row">
-            <input type="number" id="addEntryUserId" placeholder="Telegram ID (порожньо = додасться вам)" />
-          </div>
-          <button type="button" id="btnAddEntry" class="btn btn-secondary">Додати запис</button>
-        </div>
-      </section>
     </div>
 
     <div id="user" class="user-only">
@@ -264,7 +251,6 @@
       document.getElementById('btnCreateGame').onclick = createGame;
       document.getElementById('btnSetTeams').onclick = setTeams;
       document.getElementById('btnAddMatches').onclick = addMatches;
-      document.getElementById('btnAddEntry').onclick = addEntry;
     } else {
       fillJoinGameSelect(me.games || []);
       document.getElementById('btnJoin').onclick = joinGame;
@@ -289,11 +275,9 @@
     const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
     document.getElementById('setTeamsGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
-    document.getElementById('addEntryGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
     if (games.length === 1) {
       document.getElementById('setTeamsGameId').value = games[0].id;
       document.getElementById('addMatchGameId').value = games[0].id;
-      document.getElementById('addEntryGameId').value = games[0].id;
     }
   }
 
@@ -324,9 +308,12 @@
       const canPick = e.status === 'active';
       const link = canPick ? (webAppUrl + '?entry_id=' + e.entry_id) : '#';
       const cardClass = 'entry-card' + (canPick ? '' : ' disabled');
-      const ctaText = canPick ? 'Обрати команди' : 'Чекайте результатів';
-      const ctaIcon = canPick ? '⚽' : '⏳';
-      const stakeStr = e.stake != null ? ' · ' + e.stake + ' грн' : '';
+      let ctaText = 'Чекайте результатів';
+      if (canPick) ctaText = 'Обрати команди';
+      else if (e.status === 'cashed_out') ctaText = 'Виграш забрано';
+      else if (e.status === 'out') ctaText = 'Ви вибули';
+      const ctaIcon = canPick ? '⚽' : (e.status === 'cashed_out' ? '🏆' : '⏳');
+      const stakeStr = e.stake != null ? ' · ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' грн' : '';
       return '<a href="' + link + '" class="' + cardClass + '">' +
         '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
         '<div class="meta">Раунд ' + e.current_round + ' з ' + e.rounds_total + stakeStr + '</div>' +
@@ -468,24 +455,6 @@
           preview.innerHTML = '<div class="preview-title">Додано ' + added + ' матчів. Вони з’являться у виборі гравців.</div>';
         }
       }
-    } catch (e) {
-      if (tg) tg.showAlert(e.message);
-    }
-  }
-
-  async function addEntry() {
-    const gameId = document.getElementById('addEntryGameId').value;
-    const userIdInput = document.getElementById('addEntryUserId').value.trim();
-    if (!gameId) { if (tg) tg.showAlert('Оберіть гру'); return; }
-    const body = { game_id: parseInt(gameId, 10) };
-    if (userIdInput) body.user_id = parseInt(userIdInput, 10);
-    try {
-      const r = await fetch(baseUrl + '/api/entries', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Запис додано. Гравець зможе обрати матчі у своєму додатку.');
-      document.getElementById('addEntryUserId').value = '';
-      loadMe();
     } catch (e) {
       if (tg) tg.showAlert(e.message);
     }

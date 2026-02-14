@@ -589,6 +589,22 @@ async def run_round(entry_id: int, db=Depends(get_db)):
     )
 
 
+@app.post("/api/entry/{entry_id}/cash_out")
+async def cash_out(entry_id: int, db=Depends(get_db)):
+    """Забрати виграш: запис більше не активний, гравець отримує поточну суму ставки."""
+    entry = db.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.status != "active":
+        raise HTTPException(status_code=400, detail="Запис не активний або виграш вже забрано")
+    amount = entry.stake_amount if entry.stake_amount is not None else entry.stake
+    if amount is None:
+        amount = 0.0
+    entry.status = "cashed_out"
+    db.commit()
+    return {"ok": True, "amount": float(amount)}
+
+
 # ----- Admin API (require_admin) -----
 
 
