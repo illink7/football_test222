@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Survivor — Pick teams</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --tg-theme-bg-color: #1a1a2e;
+      --tg-theme-text-color: #eee;
+      --tg-theme-button-color: #16213e;
+      --tg-theme-button-text-color: #eee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--tg-theme-bg-color);
+      color: var(--tg-theme-text-color);
+      margin: 0;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    .round { opacity: 0.8; font-size: 0.9rem; margin-bottom: 16px; }
+    .loading, .error { padding: 12px; text-align: center; }
+    .error { color: #f88; }
+    select {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 1rem;
+      background: var(--tg-theme-button-color);
+      color: var(--tg-theme-text-color);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+    }
+    option { background: #1a1a2e; color: #eee; }
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      background: var(--tg-theme-button-color);
+      color: var(--tg-theme-button-text-color);
+      border: none;
+      border-radius: 8px;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Pick 2 teams</h1>
+  <p class="round" id="roundInfo">Round —</p>
+  <div id="content">
+    <p class="loading">Loading teams…</p>
+  </div>
+  <button type="button" id="submitBtn" disabled>Submit</button>
+
+  <script>
+    (function () {
+      const tg = window.Telegram?.WebApp;
+      if (tg) tg.ready();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const entryId = urlParams.get('entry_id');
+      const baseUrl = window.location.origin;
+
+      if (!entryId) {
+        document.getElementById('content').innerHTML = '<p class="error">Missing entry_id in URL.</p>';
+        return;
+      }
+
+      const roundEl = document.getElementById('roundInfo');
+      const contentEl = document.getElementById('content');
+      const submitBtn = document.getElementById('submitBtn');
+
+      let teams = [];
+      let currentRound = 0;
+
+      async function getCurrentRound() {
+        const r = await fetch(baseUrl + '/api/entry/' + entryId + '/round');
+        if (!r.ok) throw new Error('Failed to get round');
+        const d = await r.json();
+        currentRound = d.current_round;
+        roundEl.textContent = 'Round ' + currentRound;
+        return d;
+      }
+
+      async function loadTeams() {
+        const r = await fetch(baseUrl + '/api/teams/available?entry_id=' + entryId);
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error(t || 'Failed to load teams');
+        }
+        teams = await r.json();
+        if (teams.length < 2) {
+          contentEl.innerHTML = '<p class="error">Not enough teams left to pick.</p>';
+          return;
+        }
+        const opts = '<option value="">— select —</option>' + teams.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>').join('');
+        contentEl.innerHTML =
+          '<label>Team 1</label><select id="team1">' + opts + '</select>' +
+          '<label>Team 2</label><select id="team2">' + opts + '</select>';
+      }
+
+      function escapeHtml(s) {
+        const div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+      }
+
+      async function submit() {
+        const team1Id = document.getElementById('team1')?.value;
+        const team2Id = document.getElementById('team2')?.value;
+        if (!team1Id || !team2Id || team1Id === team2Id) {
+          if (tg) tg.showAlert('Please pick two different teams.');
+          else alert('Please pick two different teams.');
+          return;
+        }
+        submitBtn.disabled = true;
+        try {
+          const r = await fetch(baseUrl + '/api/selection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entry_id: parseInt(entryId, 10),
+              team1_id: parseInt(team1Id, 10),
+              team2_id: parseInt(team2Id, 10)
+            })
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            if (tg) tg.showAlert(data.detail || 'Submit failed.');
+            else alert(data.detail || 'Submit failed.');
+            submitBtn.disabled = false;
+            return;
+          }
+          if (tg) tg.close();
+          else contentEl.innerHTML = '<p class="success">Saved. You can close this page.</p>';
+        } catch (e) {
+          if (tg) tg.showAlert('Network error.');
+          else alert('Network error.');
+          submitBtn.disabled = false;
+        }
+      }
+
+      submitBtn.addEventListener('click', submit);
+
+      (async function init() {
+        try {
+          await getCurrentRound();
+          await loadTeams();
+          submitBtn.disabled = false;
+        } catch (e) {
+          contentEl.innerHTML = '<p class="error">' + escapeHtml(e.message) + '</p>';
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>
