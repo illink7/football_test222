@@ -1,7 +1,7 @@
 """
 SQLAlchemy models for Survivor Football game.
 """
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -37,7 +37,8 @@ class Entry(Base):
     user_id = Column(Integer, ForeignKey("users.tg_id"), nullable=False)
     game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
     status = Column(String(32), default="active")  # active | out
-    stake = Column(Integer, nullable=True)  # сума ставки (наприклад у гривнях)
+    stake = Column(Integer, nullable=True)  # legacy
+    stake_amount = Column(Float, nullable=True)  # поточна сума виграшу (×1.5 після кожного туру)
 
     user = relationship("User", back_populates="entries")
     game = relationship("Game", back_populates="entries")

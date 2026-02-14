@@ -53,12 +53,26 @@ def _ensure_matches_goals_columns():
             conn.commit()
 
 
+def _ensure_entries_stake_amount_column():
+    """Add entries.stake_amount (REAL) if missing; backfill from stake."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('entries') WHERE name='stake_amount'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE entries ADD COLUMN stake_amount REAL"))
+            conn.execute(text("UPDATE entries SET stake_amount = CAST(stake AS REAL) WHERE stake IS NOT NULL AND stake_amount IS NULL"))
+            conn.execute(text("UPDATE entries SET stake_amount = 10.0 WHERE stake_amount IS NULL"))
+            conn.commit()
+
+
 def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
     Base.metadata.create_all(bind=engine)
     _ensure_entries_stake_column()
     _ensure_matches_goals_columns()
+    _ensure_entries_stake_amount_column()
 
 
 def seed_teams():
