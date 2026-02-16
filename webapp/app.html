@@ -11,26 +11,30 @@
   <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
     :root {
-      --tg-theme-bg-color: #0d1f0d;
-      --tg-theme-text-color: #e8e0c8;
-      --tg-theme-button-color: #1a3d1a;
-      --tg-theme-button-text-color: #e8e0c8;
-      --pitch: #0d1f0d;
-      --grass: #143814;
-      --gold: #d4a84b;
-      --gold-light: #e8c97a;
-      --accent: #c9302c;
-      --success: #2d8a47;
-      --card-bg: rgba(20, 56, 20, 0.85);
-      --card-border: rgba(212, 168, 75, 0.35);
-      --wood: #2c1810;
+      --tg-theme-bg-color: #0a1628;
+      --tg-theme-text-color: #e0e8f0;
+      --tg-theme-button-color: #1a2d4a;
+      --tg-theme-button-text-color: #e0e8f0;
+      --pitch: #0a1628;
+      --ocean-deep: #0f1e35;
+      --ocean-dark: #152640;
+      --gold: #ffb84d;
+      --gold-light: #ffd699;
+      --accent: #ff6b6b;
+      --success: #4ecdc4;
+      --card-bg: rgba(21, 38, 64, 0.9);
+      --card-border: rgba(78, 205, 196, 0.3);
+      --wood: #1a2332;
+      --squid: #6b46c1;
     }
     * { box-sizing: border-box; }
     body {
       font-family: 'Outfit', -apple-system, sans-serif;
       background: var(--pitch);
-      background-image: radial-gradient(ellipse at 50% 0%, rgba(45, 138, 71, 0.15) 0%, transparent 50%),
-        linear-gradient(180deg, var(--grass) 0%, var(--pitch) 100%);
+      background-image: 
+        radial-gradient(ellipse at 50% 0%, rgba(78, 205, 196, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(107, 70, 193, 0.08) 0%, transparent 50%),
+        linear-gradient(180deg, var(--ocean-dark) 0%, var(--pitch) 100%);
       color: var(--tg-theme-text-color);
       margin: 0;
       padding: 0;
@@ -79,9 +83,9 @@
       transition: opacity 0.2s, transform 0.05s;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-primary { background: var(--accent); color: #fff; border: 1px solid rgba(201,48,44,0.6); }
+    .btn-primary { background: var(--accent); color: #fff; border: 1px solid rgba(255,107,107,0.5); box-shadow: 0 2px 8px rgba(255,107,107,0.2); }
     .btn-secondary { background: var(--wood); color: var(--gold-light); border: 1px solid var(--card-border); }
-    .btn-success { background: var(--success); color: #fff; border: 1px solid rgba(45,138,71,0.6); }
+    .btn-success { background: var(--success); color: #0a1628; font-weight: 600; border: 1px solid rgba(78,205,196,0.5); box-shadow: 0 2px 8px rgba(78,205,196,0.2); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     input, textarea, select {
       width: 100%;
@@ -140,7 +144,7 @@
     /* Splash: football animation */
     #splash {
       position: fixed; inset: 0; z-index: 9999;
-      background: linear-gradient(180deg, #0d1f0d 0%, #143814 50%, #0d1f0d 100%);
+      background: linear-gradient(180deg, #0a1628 0%, #152640 50%, #0a1628 100%);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       transition: opacity 0.6s ease;
     }
@@ -188,7 +192,7 @@
     }
     .history-item.win { border-left: 4px solid var(--success); }
     .history-item.loss { border-left: 4px solid var(--accent); }
-    .history-item.active { border-left: 4px solid var(--gold); }
+    .history-item.active { border-left: 4px solid var(--gold); box-shadow: 0 0 8px rgba(255,184,77,0.2); }
     .history-game { font-weight: 600; font-size: 1rem; }
     .history-meta { font-size: 0.85rem; opacity: 0.85; }
     .history-result { font-weight: 600; font-size: 0.95rem; }
@@ -215,155 +219,155 @@
   <div id="splash">
     <div class="splash-ball" aria-hidden="true">⚽</div>
     <div class="splash-title font-pirate">Survivor Football</div>
-    <p class="splash-sub">Футбол і скарби</p>
+    <p class="splash-sub">Операция: Футбол</p>
   </div>
 
   <div class="container" id="mainContainer" style="opacity:0; transition: opacity 0.5s ease;">
     <header class="header">
       <h1 class="font-pirate" style="color: var(--gold); font-size: 1.75rem;">⚽ Survivor Football</h1>
-      <p class="sub">Оберіть матчі та чекайте результатів</p>
+      <p class="sub">Выберите матчи и ждите результатов</p>
     </header>
 
-    <div id="loading" class="loading">Завантаження…</div>
+    <div id="loading" class="loading">Загрузка…</div>
     <div id="error" class="error" style="display:none;"></div>
 
     <div id="admin" class="admin-only">
       <section class="section">
-        <h2 class="section-title">🏆 Нова гра</h2>
+        <h2 class="section-title">🏆 Новая игра</h2>
         <div class="card">
-          <input type="text" id="newGameTitle" placeholder="Назва гри (наприклад: Прем'єр-ліга)" />
-          <button type="button" id="btnCreateGame" class="btn btn-primary">Створити гру</button>
+          <input type="text" id="newGameTitle" placeholder="Название игры (например: Премьер-лига)" />
+          <button type="button" id="btnCreateGame" class="btn btn-primary">Создать игру</button>
         </div>
       </section>
 
       <section class="section">
-        <h2 class="section-title">🎮 Ваші ігри</h2>
+        <h2 class="section-title">🎮 Ваши игры</h2>
         <div id="gamesList"></div>
       </section>
 
       <section class="section">
-        <h2 class="section-title">🇩🇪 Бундесліга (BL1)</h2>
+        <h2 class="section-title">🇩🇪 Бундеслига (BL1)</h2>
         <div class="card">
-          <p class="hint">Підтягнути поточний тур з <a href="https://www.football-data.org/" target="_blank" rel="noopener">Football-Data.org</a>. Потрібен API ключ (FOOTBALL_DATA_API_KEY). Створиться або оновиться гра «Bundesliga» і матчі поточного туру.</p>
+          <p class="hint">Подтянуть текущий тур из <a href="https://www.football-data.org/" target="_blank" rel="noopener">Football-Data.org</a>. Нужен API ключ (FOOTBALL_DATA_API_KEY). Создастся или обновится игра «Bundesliga» и матчи текущего тура.</p>
           <p id="fetchBl1Error" class="hint error-inline" style="display:none;"></p>
-          <button type="button" id="btnFetchBundesliga" class="btn btn-primary">Підтягнути тур Бундесліги</button>
+          <button type="button" id="btnFetchBundesliga" class="btn btn-primary">Подтянуть тур Бундеслиги</button>
         </div>
       </section>
 
       <section class="section">
-        <h2 class="section-title">⚽ Задати команди та згенерувати 10 турів</h2>
+        <h2 class="section-title">⚽ Задать команды и сгенерировать 10 туров</h2>
         <div class="card">
           <div class="form-row">
-            <label class="field-label">1. Оберіть гру</label>
-            <select id="setTeamsGameId"><option value="">— оберіть гру —</option></select>
+            <label class="field-label">1. Выберите игру</label>
+            <select id="setTeamsGameId"><option value="">— выберите игру —</option></select>
           </div>
           <div class="form-row">
-            <label class="field-label">2. Швидкі ліги — вставити 20 команд</label>
+            <label class="field-label">2. Быстрые лиги — вставить 20 команд</label>
             <div class="quick-league-btns">
-              <button type="button" class="btn btn-quick-league" id="btnLeagueEPL">🏴 Англійська Прем'єр-ліга</button>
-              <button type="button" class="btn btn-quick-league" id="btnLeagueLaLiga">🇪🇸 Ла Ліга</button>
+              <button type="button" class="btn btn-quick-league" id="btnLeagueEPL">🏴 Английская Премьер-лига</button>
+              <button type="button" class="btn btn-quick-league" id="btnLeagueLaLiga">🇪🇸 Ла Лига</button>
             </div>
           </div>
           <div class="form-row">
-            <label class="field-label">3. Список 20 команд (по одній на рядок)</label>
-            <textarea id="setTeamsText" rows="12" placeholder="Натисніть кнопку ліги вище або введіть вручну..."></textarea>
+            <label class="field-label">3. Список 20 команд (по одной на строку)</label>
+            <textarea id="setTeamsText" rows="12" placeholder="Нажмите кнопку лиги выше или введите вручную..."></textarea>
           </div>
-          <p class="hint">Система автоматично згенерує 10 турів по 10 матчів (пари тасуються кожен тур). Старі матчі гри будуть замінені.</p>
+          <p class="hint">Система автоматически сгенерирует 10 туров по 10 матчей (пары тасуются каждый тур). Старые матчи игры будут заменены.</p>
           <p id="setTeamsError" class="hint error-inline" style="display:none;"></p>
-          <button type="button" id="btnSetTeams" class="btn btn-success">Згенерувати 10 турів</button>
+          <button type="button" id="btnSetTeams" class="btn btn-success">Сгенерировать 10 туров</button>
           <div id="setTeamsPreview" class="matches-preview" style="display:none;"></div>
         </div>
       </section>
 
       <section class="section">
-        <h2 class="section-title">📋 Додати матчі вручну (один раунд)</h2>
+        <h2 class="section-title">📋 Добавить матчи вручную (один раунд)</h2>
         <div class="card">
           <div class="form-row">
-            <label class="field-label">Гра</label>
-            <select id="addMatchGameId"><option value="">— оберіть гру —</option></select>
+            <label class="field-label">Игра</label>
+            <select id="addMatchGameId"><option value="">— выберите игру —</option></select>
           </div>
           <div class="form-row">
-            <label class="field-label">Номер раунду</label>
-            <input type="number" id="addMatchRound" placeholder="Номер раунду" min="1" value="1" />
+            <label class="field-label">Номер раунда</label>
+            <input type="number" id="addMatchRound" placeholder="Номер раунда" min="1" value="1" />
           </div>
           <div class="form-row">
-            <label class="field-label">Матчі (один на рядок: Дім — Гость)</label>
-            <textarea id="addMatchText" rows="6" placeholder="Вулвергемптон — Арсенал&#10;Борнмут — Ман Юнайтед&#10;..."></textarea>
+            <label class="field-label">Матчи (один на строку: Дома — Гость)</label>
+            <textarea id="addMatchText" rows="6" placeholder="Вулверхэмптон — Арсенал&#10;Борнмут — Ман Юнайтед&#10;..."></textarea>
           </div>
           <p id="addMatchError" class="hint error-inline" style="display:none;"></p>
-          <button type="button" id="btnAddMatches" class="btn btn-secondary">Додати матчі</button>
+          <button type="button" id="btnAddMatches" class="btn btn-secondary">Добавить матчи</button>
           <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
         </div>
       </section>
     </div>
 
     <div id="user" class="user-only">
-      <nav class="tabs-wrap" aria-label="Розділи">
+      <nav class="tabs-wrap" aria-label="Разделы">
         <button type="button" class="tab-btn active" data-tab="bets" id="tabBets">⚽ Ставки</button>
-        <button type="button" class="tab-btn" data-tab="profile" id="tabProfile">🏴‍☠️ Профіль</button>
+        <button type="button" class="tab-btn" data-tab="profile" id="tabProfile">🏴‍☠️ Профиль</button>
       </nav>
       <div id="panelBets" class="tab-panel active">
         <section class="section" id="joinSection">
-          <h2 class="section-title">🎯 Приєднатися до гри</h2>
-          <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поінтів</p>
+          <h2 class="section-title">🎯 Присоединиться к игре</h2>
+          <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поинтов</p>
           <div class="card" id="joinCard">
             <div class="form-row">
-              <label class="field-label">Гра</label>
-              <select id="joinGameId"><option value="">— оберіть гру —</option></select>
+              <label class="field-label">Игра</label>
+              <select id="joinGameId"><option value="">— выберите игру —</option></select>
             </div>
             <div class="form-row">
-              <label class="field-label">Сума на один білет (поінтів)</label>
+              <label class="field-label">Сумма на один билет (поинтов)</label>
               <select id="joinStake">
-                <option value="">— оберіть ставку —</option>
+                <option value="">— выберите ставку —</option>
               </select>
             </div>
             <div class="form-row">
-              <label class="field-label">Кількість білетів (ставок)</label>
+              <label class="field-label">Количество билетов (ставок)</label>
               <select id="joinNumTickets">
-                <option value="1">1 білет</option>
-                <option value="2">2 білети</option>
-                <option value="3">3 білети</option>
-                <option value="4">4 білети</option>
-                <option value="5">5 білетів</option>
+                <option value="1">1 билет</option>
+                <option value="2">2 билета</option>
+                <option value="3">3 билета</option>
+                <option value="4">4 билета</option>
+                <option value="5">5 билетов</option>
               </select>
             </div>
-            <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
+            <button type="button" id="btnJoin" class="btn btn-primary">Присоединиться</button>
           </div>
         </section>
         <section class="section">
-          <h2 class="section-title">📋 Мої записи</h2>
+          <h2 class="section-title">📋 Мои записи</h2>
           <div id="entriesList"></div>
-          <p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>
+          <p class="hint">Выберите игру выше, сумму ставки и нажмите «Присоединиться».</p>
         </section>
       </div>
       <div id="panelProfile" class="tab-panel">
         <section class="section">
           <h2 class="section-title">💰 Баланс</h2>
           <div class="profile-balance-card">
-            <div class="profile-balance-label">Ваш скарб</div>
-            <div class="profile-balance-value" id="profileBalanceValue">— <span>поінтів</span></div>
+            <div class="profile-balance-label">Ваш баланс</div>
+            <div class="profile-balance-value" id="profileBalanceValue">— <span>поинтов</span></div>
           </div>
           <div class="card" id="walletCard">
             <div id="walletNotConnected">
-              <p class="hint">Підключіть TON гаманець для поповнення та виведення балансу</p>
-              <button type="button" class="btn btn-primary" id="btnConnectWallet">🔗 Підключити TON гаманець</button>
+              <p class="hint">Подключите TON кошелек для пополнения и вывода баланса</p>
+              <button type="button" class="btn btn-primary" id="btnConnectWallet">🔗 Подключить TON кошелек</button>
             </div>
             <div id="walletConnected" style="display:none;">
-              <p class="hint">Гаманець: <span id="walletAddress" class="wallet-addr"></span></p>
-              <button type="button" class="btn btn-secondary" id="btnDisconnectWallet">Відключити</button>
+              <p class="hint">Кошелек: <span id="walletAddress" class="wallet-addr"></span></p>
+              <button type="button" class="btn btn-secondary" id="btnDisconnectWallet">Отключить</button>
             </div>
           </div>
           <div class="profile-actions">
-            <button type="button" class="btn btn-success" id="btnAddBalance">💵 Поповнити баланс</button>
-            <button type="button" class="btn btn-secondary" id="btnWithdraw">💸 Вивести баланс</button>
+            <button type="button" class="btn btn-success" id="btnAddBalance">💵 Пополнить баланс</button>
+            <button type="button" class="btn btn-secondary" id="btnWithdraw">💸 Вывести баланс</button>
           </div>
         </section>
         <section class="section">
-          <h2 class="section-title">🏅 Досягнення</h2>
+          <h2 class="section-title">🏅 Достижения</h2>
           <div id="profileAchievements" class="achievements-wrap"></div>
         </section>
         <section class="section">
-          <h2 class="section-title">📜 Історія ставок</h2>
+          <h2 class="section-title">📜 История ставок</h2>
           <div id="profileHistory"></div>
         </section>
       </div>
@@ -417,18 +421,18 @@
     const el = document.getElementById('profileHistory');
     if (!el) return;
     if (!entries || !entries.length) {
-      el.innerHTML = '<p class="hint">Історія ставок з\'явиться тут після участі в іграх.</p>';
+      el.innerHTML = '<p class="hint">История ставок появится здесь после участия в играх.</p>';
       return;
     }
     el.innerHTML = entries.map(function (e) {
       let resultClass = 'active';
-      let resultText = 'В грі';
+      let resultText = 'В игре';
       if (e.status === 'cashed_out') {
         resultClass = 'win';
-        resultText = '+ ' + (e.stake != null ? (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) : '—') + ' поінтів';
+        resultText = '+ ' + (e.stake != null ? (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) : '—') + ' поинтов';
       } else if (e.status === 'out') {
         resultClass = 'loss';
-        resultText = 'Вибув';
+        resultText = 'Выбыл';
       }
       const stakeStr = e.stake != null ? ' Ставка: ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' п.' : '';
       return '<div class="history-item ' + resultClass + '">' +
@@ -520,18 +524,18 @@
       document.getElementById('btnAddMatches').onclick = addMatches;
       document.getElementById('btnLeagueEPL').onclick = function () {
         document.getElementById('setTeamsText').value = LEAGUE_EPL.join('\n');
-        if (tg) tg.showAlert('Вставлено 20 команд Англійської Прем\'єр-ліги. Оберіть гру та натисніть «Згенерувати 10 турів».');
+        if (tg) tg.showAlert('Вставлено 20 команд Английской Премьер-лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
       document.getElementById('btnLeagueLaLiga').onclick = function () {
         document.getElementById('setTeamsText').value = LEAGUE_LALIGA.join('\n');
-        if (tg) tg.showAlert('Вставлено 20 команд Ла Ліги. Оберіть гру та натисніть «Згенерувати 10 турів».');
+        if (tg) tg.showAlert('Вставлено 20 команд Ла Лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
     } else {
       const balance = me.balance != null ? Number(me.balance) : 0;
       document.getElementById('balanceValue').textContent = balance;
       var pv = document.getElementById('profileBalanceValue');
-      if (pv) { pv.innerHTML = balance + ' <span>поінтів</span>'; }
+      if (pv) { pv.innerHTML = balance + ' <span>поинтов</span>'; }
       fillStakeSelect(balance);
       fillJoinGameSelect(me.games || []);
       document.getElementById('btnJoin').onclick = joinGame;
@@ -549,7 +553,7 @@
         if (tonConnectUI) {
           tonConnectUI.openModal();
         } else {
-          if (tg) tg.showAlert('TON Connect не завантажено. Перезавантажте сторінку.');
+          if (tg) tg.showAlert('TON Connect не загружен. Перезагрузите страницу.');
         }
       };
       document.getElementById('btnDisconnectWallet').onclick = function () {
@@ -559,14 +563,14 @@
       };
       document.getElementById('btnAddBalance').onclick = function () {
         if (!userWalletAddress) {
-          if (tg) tg.showAlert('Спочатку підключіть TON гаманець');
+          if (tg) tg.showAlert('Сначала подключите TON кошелек');
           return;
         }
         showDepositDialog();
       };
       document.getElementById('btnWithdraw').onclick = function () {
         if (!userWalletAddress) {
-          if (tg) tg.showAlert('Спочатку підключіть TON гаманець');
+          if (tg) tg.showAlert('Сначала подключите TON кошелек');
           return;
         }
         showWithdrawDialog();
@@ -575,18 +579,18 @@
   }
 
   function showDepositDialog() {
-    var amount = prompt('Введіть суму поповнення (поінтів):');
+    var amount = prompt('Введите сумму пополнения (поинтов):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-      if (tg) tg.showAlert('Введіть коректну суму');
+      if (tg) tg.showAlert('Введите корректную сумму');
       return;
     }
     requestDeposit(parseFloat(amount));
   }
 
   function showWithdrawDialog() {
-    var amount = prompt('Введіть суму виведення (поінтів):');
+    var amount = prompt('Введите сумму вывода (поинтов):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-      if (tg) tg.showAlert('Введіть коректну суму');
+      if (tg) tg.showAlert('Введите корректную сумму');
       return;
     }
     requestWithdraw(parseFloat(amount));
@@ -610,7 +614,7 @@
         return;
       }
       if (data.test_mode) {
-        if (tg) tg.showAlert('Баланс поповнено (тестовий режим): +' + amount + ' поінтів');
+        if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' поинтов');
         loadMe();
       } else if (data.payment_link) {
         var link = data.payment_link;
@@ -619,16 +623,16 @@
         } else {
           window.open(link, '_blank');
         }
-        if (tg) tg.showAlert('Перейдіть по посиланню та оплатіть. Після оплати система автоматично перевірить транзакцію.');
+        if (tg) tg.showAlert('Перейдите по ссылке и оплатите. После оплаты система автоматически проверит транзакцию.');
         setTimeout(function () {
           checkTransactionStatus(data.transaction_id);
         }, 5000);
       } else {
-        if (tg) tg.showAlert('Помилка генерації посилання');
+        if (tg) tg.showAlert('Ошибка генерации ссылки');
       }
     } catch (e) {
-      if (tg) tg.showAlert('Помилка мережі: ' + e.message);
-      else alert('Помилка мережі: ' + e.message);
+      if (tg) tg.showAlert('Ошибка сети: ' + e.message);
+      else alert('Ошибка сети: ' + e.message);
     }
   }
 
@@ -644,10 +648,10 @@
         if (tg) tg.showAlert(data.detail || 'Помилка');
         return;
       }
-      if (tg) tg.showAlert('Запит на виведення створено. Переказимо після підтвердження.');
+      if (tg) tg.showAlert('Запрос на вывод создан. Переведем после подтверждения.');
       loadMe();
     } catch (e) {
-      if (tg) tg.showAlert('Помилка мережі');
+      if (tg) tg.showAlert('Ошибка сети');
     }
   }
 
@@ -658,7 +662,7 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (data.confirmed) {
-        if (tg) tg.showAlert('Оплата підтверджена! Баланс поповнено.');
+        if (tg) tg.showAlert('Оплата подтверждена! Баланс пополнен.');
         loadMe();
       } else {
         setTimeout(function () { checkTransactionStatus(txId); }, 5000);
@@ -669,11 +673,11 @@
   }
 
   var ACHIEVEMENT_LABELS = {
-    first_bet: 'Перша ставка',
-    first_loss: 'Перша програна ставка',
-    cashed_out_100: 'Забрав 100+ поінтів',
-    cashed_out_500: 'Забрав 500+ поінтів',
-    survived_5_rounds: 'Пройшов 5 турів'
+    first_bet: 'Первая ставка',
+    first_loss: 'Первая проигранная ставка',
+    cashed_out_100: 'Забрал 100+ поинтов',
+    cashed_out_500: 'Забрал 500+ поинтов',
+    survived_5_rounds: 'Прошел 5 туров'
   };
 
   function renderAchievements(achievements) {
@@ -682,7 +686,7 @@
     const keys = Object.keys(ACHIEVEMENT_LABELS);
     const unlockedSet = new Set((achievements || []).map(function (a) { return a.key; }));
     if (keys.length === 0) {
-      el.innerHTML = '<p class="hint">Досягнення з\'являться тут.</p>';
+      el.innerHTML = '<p class="hint">Достижения появятся здесь.</p>';
       return;
     }
     el.innerHTML = keys.map(function (key) {
@@ -700,13 +704,13 @@
   function fillStakeSelect(balance) {
     const sel = document.getElementById('joinStake');
     if (!sel) return;
-    let opts = '<option value="">— оберіть ставку —</option>';
+    let opts = '<option value="">— выберите ставку —</option>';
     STAKE_OPTIONS.forEach(function (v) {
-      if (v <= balance) opts += '<option value="' + v + '">' + v + ' поінтів</option>';
+      if (v <= balance) opts += '<option value="' + v + '">' + v + ' поинтов</option>';
     });
     sel.innerHTML = opts;
     if (balance < 10) {
-      opts += '<option value="" disabled>Недостатньо поінтів (мін. 10)</option>';
+      opts += '<option value="" disabled>Недостаточно поинтов (мин. 10)</option>';
       sel.innerHTML = opts;
     }
   }
@@ -715,7 +719,7 @@
     const sel = document.getElementById('joinGameId');
     if (!sel) return;
     const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
-    sel.innerHTML = '<option value="">— оберіть гру —</option>' + opts;
+    sel.innerHTML = '<option value="">— выберите игру —</option>' + opts;
   }
 
   function escapeHtml(s) {
@@ -737,7 +741,7 @@
   function renderGamesList(games) {
     const el = document.getElementById('gamesList');
     if (!games.length) {
-      el.innerHTML = '<div class="card game-card-admin"><span class="meta">Ігор поки немає. Створіть гру вище.</span></div>';
+      el.innerHTML = '<div class="card game-card-admin"><span class="meta">Игр пока нет. Создайте игру выше.</span></div>';
       fillGamesSelects(games);
       return;
     }
@@ -754,22 +758,22 @@
     const webAppUrl = baseUrl + '/select_teams';
     const el = document.getElementById('entriesList');
     if (!entries.length) {
-      el.innerHTML = '<p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>';
+      el.innerHTML = '<p class="hint">Выберите игру выше, сумму ставки и нажмите «Присоединиться».</p>';
       return;
     }
     el.innerHTML = entries.map(e => {
       const canPick = e.status === 'active';
       const link = canPick ? (webAppUrl + '?entry_id=' + e.entry_id) : '#';
       const cardClass = 'entry-card' + (canPick ? '' : ' disabled');
-      let ctaText = 'Чекайте результатів';
-      if (canPick) ctaText = 'Обрати команди';
-      else if (e.status === 'cashed_out') ctaText = 'Виграш забрано';
-      else if (e.status === 'out') ctaText = 'Ви вибули';
+      let ctaText = 'Ждите результатов';
+      if (canPick) ctaText = 'Выбрать команды';
+      else if (e.status === 'cashed_out') ctaText = 'Выигрыш забран';
+      else if (e.status === 'out') ctaText = 'Вы выбыли';
       const ctaIcon = canPick ? '⚽' : (e.status === 'cashed_out' ? '🏆' : '⏳');
-      const stakeStr = e.stake != null ? ' · ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' грн' : '';
+      const stakeStr = e.stake != null ? ' · ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' п.' : '';
       return '<a href="' + link + '" class="' + cardClass + '">' +
         '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
-        '<div class="meta">Раунд ' + e.current_round + ' з ' + e.rounds_total + stakeStr + '</div>' +
+        '<div class="meta">Раунд ' + e.current_round + ' из ' + e.rounds_total + stakeStr + '</div>' +
         '<span class="cta">' + ctaIcon + ' ' + ctaText + '</span>' +
       '</a>';
     }).join('');
@@ -782,11 +786,11 @@
     const stakeVal = stakeEl && stakeEl.value ? parseInt(stakeEl.value, 10) : null;
     const numTickets = numTicketsEl && numTicketsEl.value ? parseInt(numTicketsEl.value, 10) : 1;
     if (!gameId) {
-      if (tg) tg.showAlert('Оберіть гру');
+      if (tg) tg.showAlert('Выберите игру');
       return;
     }
     if (!stakeVal || stakeVal < 10) {
-      if (tg) tg.showAlert('Оберіть суму ставки (мін. 10 поінтів)');
+      if (tg) tg.showAlert('Выберите сумму ставки (мин. 10 поинтов)');
       return;
     }
     try {
@@ -796,8 +800,8 @@
         body: JSON.stringify({ game_id: parseInt(gameId, 10), stake: stakeVal, num_tickets: numTickets })
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Ви приєднались до гри. Білетів: ' + (data.num_tickets || numTickets));
+      if (!r.ok) throw new Error(data.detail || 'Ошибка');
+      if (tg) tg.showAlert('Вы присоединились к игре. Билетов: ' + (data.num_tickets || numTickets));
       loadMe();
     } catch (e) {
       if (tg) tg.showAlert(e.message);
@@ -806,12 +810,12 @@
 
   async function createGame() {
     const title = document.getElementById('newGameTitle').value.trim();
-    if (!title) { if (tg) tg.showAlert('Введіть назву гри'); return; }
+    if (!title) { if (tg) tg.showAlert('Введите название игры'); return; }
     try {
       const r = await fetch(baseUrl + '/api/games', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ title }) });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Гру створено: ' + data.title);
+      if (!r.ok) throw new Error(data.detail || 'Ошибка');
+      if (tg) tg.showAlert('Игру создано: ' + data.title);
       document.getElementById('newGameTitle').value = '';
       loadMe();
     } catch (e) {
@@ -828,16 +832,16 @@
     const gameId = document.getElementById('setTeamsGameId').value;
     const text = document.getElementById('setTeamsText').value;
     if (!gameId) {
-      errEl.textContent = 'Оберіть гру зі списку вище.';
+      errEl.textContent = 'Выберите игру из списка выше.';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Оберіть гру');
+      if (tg) tg.showAlert('Выберите игру');
       return;
     }
     const team_names = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (team_names.length !== 20) {
-      errEl.textContent = 'Потрібно рівно 20 команд (по одній на рядок). Зараз: ' + team_names.length;
+      errEl.textContent = 'Нужно ровно 20 команд (по одной на строку). Сейчас: ' + team_names.length;
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Введіть рівно 20 назв команд');
+      if (tg) tg.showAlert('Введите ровно 20 названий команд');
       return;
     }
     try {
@@ -847,10 +851,10 @@
         body: JSON.stringify({ team_names })
       });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Помилка');
-      if (tg) tg.showAlert('Згенеровано 10 турів по 10 матчів. Старі матчі гри замінені.');
+      if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Ошибка');
+      if (tg) tg.showAlert('Сгенерировано 10 туров по 10 матчей. Старые матчи игры заменены.');
       previewEl.style.display = 'block';
-      previewEl.innerHTML = '<div class="preview-title">Готово: 10 турів, у кожному по 10 матчів (пари змішані для кожного туру).</div>';
+      previewEl.innerHTML = '<div class="preview-title">Готово: 10 туров, в каждом по 10 матчей (пары перемешаны для каждого тура).</div>';
       loadMe();
     } catch (e) {
       errEl.textContent = e.message;
@@ -867,12 +871,12 @@
       const r = await fetch(baseUrl + '/api/admin/fetch_bundesliga_round', { method: 'POST', headers: authHeaders() });
       const data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        errEl.textContent = data.detail || 'Помилка';
+        errEl.textContent = data.detail || 'Ошибка';
         errEl.style.display = 'block';
-        if (tg) tg.showAlert(data.detail || 'Помилка');
+        if (tg) tg.showAlert(data.detail || 'Ошибка');
         return;
       }
-      if (tg) tg.showAlert('Готово: ' + (data.title || 'Bundesliga') + ', тур ' + data.matchday + ', матчів: ' + (data.matches_count || 0));
+      if (tg) tg.showAlert('Готово: ' + (data.title || 'Bundesliga') + ', тур ' + data.matchday + ', матчей: ' + (data.matches_count || 0));
       loadMe();
     } catch (e) {
       errEl.textContent = e.message;
@@ -889,21 +893,21 @@
     const round = parseInt(document.getElementById('addMatchRound').value, 10);
     const text = document.getElementById('addMatchText').value;
     if (!gameId) {
-      errEl.textContent = 'Спочатку оберіть гру зі списку вище.';
+      errEl.textContent = 'Сначала выберите игру из списка выше.';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Оберіть гру зі списку «Оберіть гру»');
+      if (tg) tg.showAlert('Выберите игру из списка «Выберите игру»');
       return;
     }
     if (!round || round < 1) {
-      errEl.textContent = 'Вкажіть номер раунду (1, 2, 3...).';
+      errEl.textContent = 'Укажите номер раунда (1, 2, 3...).';
       errEl.style.display = 'block';
       return;
     }
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) {
-      errEl.textContent = 'Введіть хоча б один матч у форматі: Дім — Гость (один на рядок).';
+      errEl.textContent = 'Введите хотя бы один матч в формате: Дома — Гость (один на строку).';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Введіть матчі в текстове поле');
+      if (tg) tg.showAlert('Введите матчи в текстовое поле');
       return;
     }
     try {
@@ -943,20 +947,20 @@
 
   async function loadMe() {
     if (!initData) {
-      showError('Відкрийте додаток з чату бота @PriceCalculatorNL_bot (кнопка меню або /start), а не по прямому посиланню в браузері.');
+      showError('Откройте приложение из чата бота @PriceCalculatorNL_bot (кнопка меню или /start), а не по прямой ссылке в браузере.');
       return;
     }
     try {
       const r = await fetch(baseUrl + '/api/me', { headers: authHeaders() });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        const msg = data.detail || 'Помилка авторизації';
-        showError(msg + '\n\nВідкрийте додаток саме з бота @PriceCalculatorNL_bot. Якщо ви зайшли з іншого бота — авторизація не працюватиме.');
+        const msg = data.detail || 'Ошибка авторизации';
+        showError(msg + '\n\nОткройте приложение именно из бота @PriceCalculatorNL_bot. Если вы зашли из другого бота — авторизация не будет работать.');
         return;
       }
       showContent(data);
     } catch (e) {
-      showError('Помилка мережі: ' + e.message);
+      showError('Ошибка сети: ' + e.message);
     }
   }
 

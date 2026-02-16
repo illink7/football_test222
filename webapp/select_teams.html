@@ -10,23 +10,27 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --pitch: #0d1f0d;
-      --grass: #143814;
-      --gold: #d4a84b;
-      --gold-light: #e8c97a;
-      --accent: #c9302c;
-      --success: #2d8a47;
-      --card-bg: rgba(20, 56, 20, 0.85);
-      --card-border: rgba(212, 168, 75, 0.35);
+      --pitch: #0a1628;
+      --ocean-deep: #0f1e35;
+      --ocean-dark: #152640;
+      --gold: #ffb84d;
+      --gold-light: #ffd699;
+      --accent: #ff6b6b;
+      --success: #4ecdc4;
+      --card-bg: rgba(21, 38, 64, 0.9);
+      --card-border: rgba(78, 205, 196, 0.3);
       --tg-theme-bg-color: var(--pitch);
-      --tg-theme-text-color: #e8e0c8;
+      --tg-theme-text-color: #e0e8f0;
+      --squid: #6b46c1;
     }
     * { box-sizing: border-box; }
     body {
       font-family: 'Outfit', -apple-system, sans-serif;
       background: var(--pitch);
-      background-image: radial-gradient(ellipse at 50% 0%, rgba(45, 138, 71, 0.12) 0%, transparent 50%),
-        linear-gradient(180deg, var(--grass) 0%, var(--pitch) 100%);
+      background-image: 
+        radial-gradient(ellipse at 50% 0%, rgba(78, 205, 196, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(107, 70, 193, 0.08) 0%, transparent 50%),
+        linear-gradient(180deg, var(--ocean-dark) 0%, var(--pitch) 100%);
       color: var(--tg-theme-text-color);
       margin: 0;
       padding: 0;
@@ -74,12 +78,13 @@
     }
     .team-row:active { opacity: 0.95; }
     .team-row.selected {
-      background: rgba(78, 204, 163, 0.2);
+      background: rgba(78, 205, 196, 0.25);
       border-color: var(--success);
+      box-shadow: 0 0 12px rgba(78, 205, 196, 0.3);
     }
     .team-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
     .team-row.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
-    .team-row.used { background: rgba(233, 69, 96, 0.2); border-color: rgba(233, 69, 96, 0.5); cursor: not-allowed; opacity: 0.9; }
+    .team-row.used { background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.4); cursor: not-allowed; opacity: 0.7; }
     .team-row.used .name { opacity: 0.9; }
     .team-row .name { flex: 1; font-size: 1rem; }
     .match-row {
@@ -105,7 +110,7 @@
       border: 2px solid transparent;
     }
     .team-btn .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
-    .team-btn.selected { background: rgba(78, 204, 163, 0.2); border-color: var(--success); }
+    .team-btn.selected { background: rgba(78, 205, 196, 0.25); border-color: var(--success); box-shadow: 0 0 8px rgba(78, 205, 196, 0.3); }
     .team-btn.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
     .team-btn.used { opacity: 0.7; cursor: not-allowed; }
     .team-btn:active:not(.used) { opacity: 0.95; }
@@ -126,7 +131,7 @@
       transition: opacity 0.2s, transform 0.05s;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(45,138,71,0.2); }
+    .btn-success { background: var(--success); color: #0a1628; font-weight: 600; box-shadow: 0 4px 12px rgba(78,205,196,0.3); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .success-screen { text-align: center; padding: 32px 20px; }
     .success-screen .icon { font-size: 3rem; margin-bottom: 16px; }
@@ -171,8 +176,8 @@
     .match-score-grid .away { text-align: left; }
     .match-score-grid .score { font-weight: 700; min-width: 3.5em; text-align: center; font-variant-numeric: tabular-nums; }
     .ticket-result { padding: 12px 16px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--card-border); }
-    .ticket-result.passed { background: rgba(45,138,71,0.2); border-color: var(--success); }
-    .ticket-result.failed { background: rgba(201,48,44,0.15); border-color: rgba(201,48,44,0.5); }
+    .ticket-result.passed { background: rgba(78,205,196,0.2); border-color: var(--success); }
+    .ticket-result.failed { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4); }
     .ticket-result .team-not-scored { color: var(--accent); font-size: 0.9rem; margin-top: 6px; }
     .ticket-result .stake-after { font-size: 0.85rem; opacity: 0.9; }
     .section-label { font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin: 16px 0 8px; }
@@ -181,23 +186,23 @@
 <body>
   <div class="container">
     <header class="header">
-      <h1>⚽ Обрати команди</h1>
+      <h1>⚽ Выбрать команды</h1>
       <div class="round-badge" id="roundInfo">Тур —</div>
-      <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> грн <span class="muted">(×1.5 після кожного туру)</span></p>
+      <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> п. <span class="muted">(×1.5 после каждого тура)</span></p>
     </header>
 
-    <p class="intro" id="intro">Оберіть для кожного білета по дві команди, які заб'ють. У наступних турах для цього білета не можна вибирати вже використані команди.</p>
+    <p class="intro" id="intro">Выберите для каждого билета по две команды, которые забьют. В следующих турах для этого билета нельзя выбирать уже использованные команды.</p>
 
     <div id="content" class="content">
-      <p class="loading">Завантаження…</p>
+      <p class="loading">Загрузка…</p>
     </div>
 
-    <p class="counter" id="counter" style="display:none;">Обрано: 0 з 2</p>
+    <p class="counter" id="counter" style="display:none;">Выбрано: 0 из 2</p>
     <button type="button" id="submitBtn" class="btn btn-success" disabled style="display:none;">
-      Підтвердити вибір
+      Подтвердить выбор
     </button>
     <div id="runRoundWrap" style="display:none;" class="run-round-wrap">
-      <button type="button" id="btnRunRound" class="btn btn-primary">Отримати результати туру</button>
+      <button type="button" id="btnRunRound" class="btn btn-primary">Получить результаты тура</button>
     </div>
   </div>
 
@@ -218,8 +223,8 @@
 
   if (!entryId) {
     document.getElementById('content').innerHTML =
-      '<p class="info">Відкрийте додаток з головного меню бота — там будуть ваші записи та кнопка «Обрати команди».</p>' +
-      '<p class="info">Якщо записів немає, адмін додасть вас у гру.</p>';
+      '<p class="info">Откройте приложение из главного меню бота — там будут ваши записи и кнопка «Выбрать команды».</p>' +
+      '<p class="info">Если записей нет, админ добавит вас в игру.</p>';
     document.getElementById('roundInfo').style.display = 'none';
     document.getElementById('intro').style.display = 'none';
     document.getElementById('submitBtn').style.display = 'none';
@@ -247,7 +252,7 @@
 
   async function loadTeamsForRound() {
     const r = await fetch(baseUrl + '/api/entry/' + entryId + '/teams_for_round');
-    if (!r.ok) throw new Error('Не вдалося завантажити список команд');
+    if (!r.ok) throw new Error('Не удалось загрузить список команд');
     return r.json();
   }
 
@@ -268,7 +273,7 @@
       if (btn) { btn.classList.add('selected'); var c = btn.querySelector('.check'); if (c) c.textContent = '✓'; }
       if (row) { row.classList.add('selected'); var c = row.querySelector('.check'); if (c) c.textContent = '✓'; }
     });
-    counterEl.textContent = 'Обрано: ' + selectedIds.length + ' з 2';
+    counterEl.textContent = 'Выбрано: ' + selectedIds.length + ' из 2';
     submitBtn.disabled = selectedIds.length !== 2;
   }
 
@@ -292,7 +297,7 @@
     } else { stakeLineEl.style.display = 'none'; }
 
     if (teamsData.length === 0 && matches.length === 0) {
-      contentEl.innerHTML = '<p class="info">Команди для цього туру ще не додано. Оновіть сторінку пізніше.</p>';
+      contentEl.innerHTML = '<p class="info">Команды для этого тура еще не добавлены. Обновите страницу позже.</p>';
       submitBtn.style.display = 'none';
       counterEl.style.display = 'none';
       document.getElementById('runRoundWrap').style.display = 'none';
@@ -308,28 +313,28 @@
       const usedSet = ticket ? new Set((ticket.used_team_ids || []).map(Number)) : new Set();
       selectedIds = [];
       introEl.style.display = 'none';
-      let html = '<p class="info" style="margin-bottom:12px;">Білет ' + currentTicketIndex + ' — оберіть дві команди:</p>';
+      let html = '<p class="info" style="margin-bottom:12px;">Билет ' + currentTicketIndex + ' — выберите две команды:</p>';
       if (matches.length > 0) {
         html += matches.map(function (m) {
           var homeUsed = usedSet.has(m.home_id), awayUsed = usedSet.has(m.away_id);
           return '<div class="match-row">' +
             '<span class="team-btn' + (homeUsed ? ' used' : '') + '" data-team-id="' + m.home_id + '" data-used="' + (homeUsed ? '1' : '0') + '" role="button" tabindex="0">' +
-              '<span class="check"></span>' + escapeHtml(m.home_name) + (homeUsed ? ' (вик.)' : '') + '</span>' +
+              '<span class="check"></span>' + escapeHtml(m.home_name) + (homeUsed ? ' (исп.)' : '') + '</span>' +
             ' <span class="vs">—</span> ' +
             '<span class="team-btn' + (awayUsed ? ' used' : '') + '" data-team-id="' + m.away_id + '" data-used="' + (awayUsed ? '1' : '0') + '" role="button" tabindex="0">' +
-              '<span class="check"></span>' + escapeHtml(m.away_name) + (awayUsed ? ' (вик.)' : '') + '</span>' +
+              '<span class="check"></span>' + escapeHtml(m.away_name) + (awayUsed ? ' (исп.)' : '') + '</span>' +
           '</div>';
         }).join('');
       } else {
         html += teamsData.map(function (t) {
           var used = usedSet.has(t.id);
           return '<div class="team-row' + (used ? ' used' : '') + '" data-team-id="' + t.id + '" data-used="' + (used ? '1' : '0') + '" role="button" tabindex="0">' +
-            '<span class="check"></span><span class="name">' + escapeHtml(t.name) + (used ? ' (вик.)' : '') + '</span></div>';
+            '<span class="check"></span><span class="name">' + escapeHtml(t.name) + (used ? ' (исп.)' : '') + '</span></div>';
         }).join('');
       }
       contentEl.innerHTML = html;
       counterEl.style.display = 'block';
-      counterEl.textContent = 'Обрано: 0 з 2';
+      counterEl.textContent = 'Выбрано: 0 из 2';
       submitBtn.style.display = 'block';
       submitBtn.disabled = true;
       contentEl.querySelectorAll('.team-btn').forEach(function (btn) {
@@ -344,32 +349,32 @@
       return;
     }
 
-    selectedIds = [];
-    introEl.style.display = 'block';
-    submitBtn.style.display = 'none';
-    counterEl.style.display = 'none';
-    let html = '';
-    if (tickets.length > 0) {
-      html += '<div class="ticket-cards">';
-      tickets.forEach(function (t) {
-        var out = t.status !== 'active';
-        var sel = t.selection;
-        html += '<div class="ticket-card' + (out ? ' out' : '') + '">';
-        html += '<div><span class="ticket-title">🎫 Білет ' + t.ticket_index + '</span> · ' + formatStake(t.stake_amount) + ' п.</div>';
-        if (out) {
-          html += '<span class="ticket-teams">Вибув</span>';
-        } else if (sel) {
-          html += '<span class="ticket-teams">' + escapeHtml(sel.team1_name) + ', ' + escapeHtml(sel.team2_name) + '</span>';
-          html += '<button type="button" class="btn-pick" data-ticket="' + t.ticket_index + '">Змінити</button>';
-        } else {
-          html += '<button type="button" class="btn-pick" data-ticket="' + t.ticket_index + '">Обрати команди</button>';
-        }
+      selectedIds = [];
+      introEl.style.display = 'block';
+      submitBtn.style.display = 'none';
+      counterEl.style.display = 'none';
+      let html = '';
+      if (tickets.length > 0) {
+        html += '<div class="ticket-cards">';
+        tickets.forEach(function (t) {
+          var out = t.status !== 'active';
+          var sel = t.selection;
+          html += '<div class="ticket-card' + (out ? ' out' : '') + '">';
+          html += '<div><span class="ticket-title">🎫 Билет ' + t.ticket_index + '</span> · ' + formatStake(t.stake_amount) + ' п.</div>';
+          if (out) {
+            html += '<span class="ticket-teams">Выбыл</span>';
+          } else if (sel) {
+            html += '<span class="ticket-teams">' + escapeHtml(sel.team1_name) + ', ' + escapeHtml(sel.team2_name) + '</span>';
+            html += '<button type="button" class="btn-pick" data-ticket="' + t.ticket_index + '">Изменить</button>';
+          } else {
+            html += '<button type="button" class="btn-pick" data-ticket="' + t.ticket_index + '">Выбрать команды</button>';
+          }
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
-    }
-    if (matches.length > 0) {
-      html += '<p class="info" style="margin-bottom:8px;">Натисніть «Обрати команди» для білета, потім оберіть дві команди з матчів нижче.</p>';
+      }
+      if (matches.length > 0) {
+        html += '<p class="info" style="margin-bottom:8px;">Нажмите «Выбрать команды» для билета, затем выберите две команды из матчей ниже.</p>';
       html += matches.map(function (m) {
         return '<div class="match-row">' +
           '<span class="team-btn" data-team-id="' + m.home_id + '" data-used="0" role="button" tabindex="0"><span class="check"></span>' + escapeHtml(m.home_name) + '</span>' +
@@ -400,21 +405,21 @@
     let sec = 10;
     function tick() {
       if (sec > 0) {
-        waitEl.textContent = sec + '… Скоро будуть результати.';
+        waitEl.textContent = sec + '… Скоро будут результаты.';
         sec--;
         setTimeout(tick, 1000);
         return;
       }
-      waitEl.textContent = 'Завантаження результатів…';
+      waitEl.textContent = 'Загрузка результатов…';
       fetch(baseUrl + '/api/entry/' + entryId + '/run_round', { method: 'POST' })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           showResultsScreen(data);
         })
         .catch(function () {
-          if (tg) tg.showAlert('Не вдалося отримати результати');
-          else alert('Не вдалося отримати результати');
-          if (waitEl) waitEl.textContent = 'Помилка. Оновіть сторінку.';
+          if (tg) tg.showAlert('Не удалось получить результаты');
+          else alert('Не удалось получить результаты');
+          if (waitEl) waitEl.textContent = 'Ошибка. Обновите страницу.';
         });
     }
     tick();
@@ -426,8 +431,8 @@
     contentEl.innerHTML =
       '<div class="success-screen">' +
         '<div class="icon">⏳</div>' +
-        '<h2>Результати туру</h2>' +
-        '<p class="wait">10… Скоро будуть результати.</p>' +
+        '<h2>Результаты тура</h2>' +
+        '<p class="wait">10… Скоро будут результаты.</p>' +
       '</div>';
     startCountdownThenRunRound();
   }
@@ -441,17 +446,17 @@
     const tickets = data.tickets || [];
     let html = '<div class="results-screen">';
     html += '<div class="icon">' + (passed ? '✅' : '❌') + '</div>';
-    html += '<h2>' + (passed ? 'Проходите далі!' : 'Результати туру') + '</h2>';
+    html += '<h2>' + (passed ? 'Проходите дальше!' : 'Результаты тура') + '</h2>';
     html += '<p class="message ' + (passed ? 'passed' : 'out') + '">' + escapeHtml(data.message || '') + '</p>';
     if (data.stake_after_round != null) {
-      html += '<p class="stake-line">Сума активних білетів: <strong>' + formatStake(data.stake_after_round) + '</strong> поінтів</p>';
+      html += '<p class="stake-line">Сумма активных билетов: <strong>' + formatStake(data.stake_after_round) + '</strong> поинтов</p>';
     }
     if (tickets.length > 0) {
-      html += '<p class="section-label">Ваші білети</p>';
+      html += '<p class="section-label">Ваши билеты</p>';
       tickets.forEach(function (t) {
         html += '<div class="ticket-result ' + (t.passed ? 'passed' : 'failed') + '">';
-        html += '<strong>Білет ' + t.ticket_index + '</strong>: ' + escapeHtml(t.team1_name) + ', ' + escapeHtml(t.team2_name);
-        html += ' — ' + (t.passed ? '✓ обидві забили' : '✗ не забили');
+        html += '<strong>Билет ' + t.ticket_index + '</strong>: ' + escapeHtml(t.team1_name) + ', ' + escapeHtml(t.team2_name);
+        html += ' — ' + (t.passed ? '✓ обе забили' : '✗ не забили');
         if (!t.passed && t.team_not_scored) {
           html += '<div class="team-not-scored">Не забила: ' + escapeHtml(t.team_not_scored) + '</div>';
         }
@@ -460,7 +465,7 @@
       });
     }
     if (data.matches && data.matches.length) {
-      html += '<p class="section-label">Рахунки матчів</p>';
+      html += '<p class="section-label">Счеты матчей</p>';
       data.matches.forEach(function (m) {
         html += '<div class="match-score-grid">' +
           '<span class="home">' + escapeHtml(m.home_name) + '</span>' +
@@ -471,11 +476,11 @@
     }
     if (passed) {
       html += '<div class="btn-row">';
-      html += '<button type="button" class="btn btn-success" id="btnNextRound">Продовжити далі</button>';
-      html += '<button type="button" class="btn btn-outline" id="btnCashOut">Забрати виграш</button>';
+      html += '<button type="button" class="btn btn-success" id="btnNextRound">Продолжить дальше</button>';
+      html += '<button type="button" class="btn btn-outline" id="btnCashOut">Забрать выигрыш</button>';
       html += '</div>';
     } else {
-      html += '<button type="button" class="btn btn-success btn-next" id="btnMainMenuOut">Повернутися на головне меню</button>';
+      html += '<button type="button" class="btn btn-success btn-next" id="btnMainMenuOut">Вернуться в главное меню</button>';
     }
     html += '</div>';
     contentEl.innerHTML = html;
@@ -497,16 +502,16 @@
             contentEl.innerHTML =
               '<div class="results-screen win-screen">' +
                 '<div class="icon">🏆</div>' +
-                '<h2>Ви виграли!</h2>' +
-                '<p class="amount">' + amount + ' поінтів</p>' +
+                '<h2>Вы выиграли!</h2>' +
+                '<p class="amount">' + amount + ' поинтов</p>' +
                 balanceStr +
-                '<p class="message passed">Ви забрали виграш. Дякуємо за гру!</p>' +
-                '<button type="button" class="btn btn-success btn-next" id="btnMainMenuWin">На головне меню</button>' +
+                '<p class="message passed">Вы забрали выигрыш. Спасибо за игру!</p>' +
+                '<button type="button" class="btn btn-success btn-next" id="btnMainMenuWin">В главное меню</button>' +
               '</div>';
             document.getElementById('btnMainMenuWin').addEventListener('click', goToMainMenu);
           })
           .catch(function () {
-            if (tg) tg.showAlert('Помилка. Спробуйте ще раз.');
+            if (tg) tg.showAlert('Ошибка. Попробуйте еще раз.');
             btnCashOut.disabled = false;
           });
       });
@@ -519,12 +524,12 @@
 
   async function submitTwoTeams() {
     if (selectedIds.length !== 2) {
-      if (tg) tg.showAlert('Оберіть рівно дві команди');
+      if (tg) tg.showAlert('Выберите ровно две команды');
       return;
     }
     var ti = currentTicketIndex != null ? currentTicketIndex : 1;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Збереження…';
+    submitBtn.textContent = 'Сохранение…';
     try {
       var r = await fetch(baseUrl + '/api/entry/' + entryId + '/submit_teams', {
         method: 'POST',
@@ -533,23 +538,23 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        if (tg) tg.showAlert(data.detail || 'Помилка збереження');
-        else alert(data.detail || 'Помилка збереження');
+        if (tg) tg.showAlert(data.detail || 'Ошибка сохранения');
+        else alert(data.detail || 'Ошибка сохранения');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Підтвердити вибір';
+        submitBtn.textContent = 'Подтвердить выбор';
         return;
       }
       currentTicketIndex = null;
       roundData = await loadTeamsForRound();
       renderMain(roundData);
-      if (tg) tg.showAlert('Білет ' + ti + ': вибір збережено');
+      if (tg) tg.showAlert('Билет ' + ti + ': выбор сохранен');
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Підтвердити вибір';
+      submitBtn.textContent = 'Подтвердить выбор';
     } catch (e) {
-      if (tg) tg.showAlert('Помилка мережі');
-      else alert('Помилка мережі');
+      if (tg) tg.showAlert('Ошибка сети');
+      else alert('Ошибка сети');
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Підтвердити вибір';
+      submitBtn.textContent = 'Подтвердить выбор';
     }
   }
 
@@ -565,7 +570,7 @@
         if (runBtn) runBtn.addEventListener('click', onRunRoundClick);
         return;
       }
-      contentEl.innerHTML = '<p class="info">Команди для цього туру поки не додано. Оновіть сторінку пізніше.</p>';
+      contentEl.innerHTML = '<p class="info">Команды для этого тура пока не добавлены. Обновите страницу позже.</p>';
       submitBtn.style.display = 'none';
       counterEl.style.display = 'none';
       roundEl.style.display = 'none';
