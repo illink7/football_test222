@@ -51,12 +51,13 @@ class Entry(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.tg_id"), nullable=False)
     game_id = Column(Integer, ForeignKey("games.id"), nullable=False)
-    status = Column(String(32), default="active")  # active | out
+    status = Column(String(32), default="active")  # active | out | cashed_out
     stake = Column(Integer, nullable=True)  # legacy
-    stake_amount = Column(Float, nullable=True)  # поточна сума виграшу (×1.5 після кожного туру)
+    stake_amount = Column(Float, nullable=True)  # legacy; для кількох білетів використовуй Ticket.stake_amount
 
     user = relationship("User", back_populates="entries")
     game = relationship("Game", back_populates="entries")
+    tickets = relationship("Ticket", back_populates="entry", lazy="selectin", order_by="Ticket.ticket_index")
     selections = relationship(
         "Selection",
         back_populates="entry",
@@ -68,6 +69,19 @@ class Entry(Base):
         back_populates="entry",
         lazy="selectin",
     )
+
+
+class Ticket(Base):
+    """Один білет (ставка) в межах запису. У кожному турі для білета обирають 2 команди; використані команди не повторюються в наступних турах для цього білета."""
+    __tablename__ = "tickets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entry_id = Column(Integer, ForeignKey("entries.id"), nullable=False)
+    ticket_index = Column(Integer, nullable=False)  # 1, 2, 3, ...
+    stake_amount = Column(Float, nullable=False)  # поточна сума (×1.5 після кожного пройденого туру)
+    status = Column(String(32), default="active")  # active | out
+
+    entry = relationship("Entry", back_populates="tickets")
 
 
 class Team(Base):
@@ -113,6 +127,7 @@ class Selection(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entry_id = Column(Integer, ForeignKey("entries.id"), nullable=False)
+    ticket_index = Column(Integer, nullable=False, default=1)  # до якого білета належить вибір
     round = Column(Integer, nullable=False)
     team1_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     team2_id = Column(Integer, ForeignKey("teams.id"), nullable=False)

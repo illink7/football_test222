@@ -308,9 +308,19 @@
               <select id="joinGameId"><option value="">— оберіть гру —</option></select>
             </div>
             <div class="form-row">
-              <label class="field-label">Сума ставки (поінтів)</label>
+              <label class="field-label">Сума на один білет (поінтів)</label>
               <select id="joinStake">
                 <option value="">— оберіть ставку —</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="field-label">Кількість білетів (ставок)</label>
+              <select id="joinNumTickets">
+                <option value="1">1 білет</option>
+                <option value="2">2 білети</option>
+                <option value="3">3 білети</option>
+                <option value="4">4 білети</option>
+                <option value="5">5 білетів</option>
               </select>
             </div>
             <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
@@ -561,7 +571,9 @@
   async function joinGame() {
     const gameId = document.getElementById('joinGameId').value;
     const stakeEl = document.getElementById('joinStake');
+    const numTicketsEl = document.getElementById('joinNumTickets');
     const stakeVal = stakeEl && stakeEl.value ? parseInt(stakeEl.value, 10) : null;
+    const numTickets = numTicketsEl && numTicketsEl.value ? parseInt(numTicketsEl.value, 10) : 1;
     if (!gameId) {
       if (tg) tg.showAlert('Оберіть гру');
       return;
@@ -574,11 +586,11 @@
       const r = await fetch(baseUrl + '/api/join_game', {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ game_id: parseInt(gameId, 10), stake: stakeVal })
+        body: JSON.stringify({ game_id: parseInt(gameId, 10), stake: stakeVal, num_tickets: numTickets })
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Помилка');
-      if (tg) tg.showAlert('Ви приєднались до гри.');
+      if (tg) tg.showAlert('Ви приєднались до гри. Білетів: ' + (data.num_tickets || numTickets));
       loadMe();
     } catch (e) {
       if (tg) tg.showAlert(e.message);

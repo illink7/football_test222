@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY
 from database import get_db
-from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, User, UserAchievement
+from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, Ticket, User, UserAchievement
 from webapp.telegram_auth import get_user_id_from_init_data
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -63,19 +63,32 @@ class MatchScoreItem(BaseModel):
     away_goals: int
 
 
-class RoundResultResponse(BaseModel):
+class TicketResultItem(BaseModel):
+    ticket_index: int
     passed: bool
+    team1_name: str
+    team2_name: str
+    team1_scored: bool
+    team2_scored: bool
+    stake_after: float
+    team_not_scored: str | None = None  # назва команди, яка не забила (якщо вибув)
+
+
+class RoundResultResponse(BaseModel):
+    passed: bool  # хоч один білет пройшов
     round: int
     matches: list[MatchScoreItem]
     your_team1_scored: bool
     your_team2_scored: bool
     message: str
-    stake_after_round: float | None = None  # поточна сума після туру (×1.5 якщо пройшов)
+    stake_after_round: float | None = None  # сума по всіх активних білетах
+    tickets: list[TicketResultItem] = []  # результат по кожному білету
 
 
 class SubmitTwoTeams(BaseModel):
     team1_id: int
     team2_id: int
+    ticket_index: int = 1
 
 
 class GameCreate(BaseModel):
@@ -99,7 +112,8 @@ class EntryAdd(BaseModel):
 
 class JoinGameBody(BaseModel):
     game_id: int
-    stake: int | None = None  # сума ставки (грн)
+    stake: int | None = None  # сума ставки на один білет (поінтів)
+    num_tickets: int | None = None  # кількість білетів (ставок); за замовч. 1
 
 
 # ----- Auth: require valid Telegram initData -----
@@ -238,21 +252,25 @@ async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db
     ).scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="Ви вже приєднані до цієї гри")
+    num_tickets = max(1, min(10, int(body.num_tickets or 1)))
     initial_stake = float(body.stake) if body.stake is not None else 10.0
     stake_int = int(round(initial_stake))
     if stake_int < 1:
-        raise HTTPException(status_code=400, detail="Мінімальна ставка — 1 грн")
-    if user.balance < stake_int:
-        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Ваш баланс: " + str(user.balance))
-    user.balance -= stake_int
+        raise HTTPException(status_code=400, detail="Мінімальна ставка — 1 поінт")
+    total_cost = stake_int * num_tickets
+    if user.balance < total_cost:
+        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Потрібно: " + str(total_cost) + ", ваш баланс: " + str(user.balance))
+    user.balance -= total_cost
     entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=float(stake_int))
     db.add(entry)
     db.flush()
+    for i in range(1, num_tickets + 1):
+        db.add(Ticket(entry_id=entry.id, ticket_index=i, stake_amount=float(stake_int), status="active"))
     _grant_achievement(db, uid, "first_bet")
     db.commit()
     db.refresh(entry)
     db.refresh(user)
-    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": entry.stake_amount, "balance": user.balance}
+    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": stake_int, "num_tickets": num_tickets, "balance": user.balance}
 
 
 @app.get("/api/teams/available")
@@ -413,7 +431,7 @@ async def submit_match_selections(entry_id: int, body: MatchSelectionSubmit, db=
 
 @app.get("/api/entry/{entry_id}/teams_for_round")
 async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
-    """Команди поточного туру, без тих, що гравець вже вибирав у попередніх турах. + поточна ставка."""
+    """Поточний тур: матчі + по кожному білету — використані команди та поточний вибір (якщо є)."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -423,19 +441,10 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
-    used_team_ids: set[int] = set()
-    prev = (
-        db.execute(
-            select(Selection.team1_id, Selection.team2_id).where(
-                Selection.entry_id == entry_id,
-                Selection.round < rnd,
-            )
-        )
-        .all()
+    tickets_raw = (
+        db.execute(select(Ticket).where(Ticket.entry_id == entry_id).order_by(Ticket.ticket_index))
+        .scalars().all()
     )
-    for row in prev:
-        used_team_ids.add(row[0])
-        used_team_ids.add(row[1])
     matches = (
         db.execute(
             select(Match)
@@ -444,8 +453,12 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
         )
         .scalars().all()
     )
-    seen: set[int] = set()
+    match_rows = [
+        {"home_id": m.home_team_id, "home_name": m.home_team.name, "away_id": m.away_team_id, "away_name": m.away_team.name}
+        for m in matches
+    ]
     teams_list: list[Team] = []
+    seen: set[int] = set()
     for m in matches:
         for tid in (m.home_team_id, m.away_team_id):
             if tid not in seen:
@@ -453,29 +466,63 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
                 t = db.get(Team, tid)
                 if t:
                     teams_list.append(t)
-    stake = entry.stake_amount if entry.stake_amount is not None else entry.stake
-    match_rows = [
-        {
-            "home_id": m.home_team_id,
-            "home_name": m.home_team.name,
-            "away_id": m.away_team_id,
-            "away_name": m.away_team.name,
-        }
-        for m in matches
-    ]
+    tickets_out: list[dict] = []
+    for ticket in tickets_raw:
+        used_team_ids: set[int] = set()
+        prev = (
+            db.execute(
+                select(Selection.team1_id, Selection.team2_id).where(
+                    Selection.entry_id == entry_id,
+                    Selection.ticket_index == ticket.ticket_index,
+                    Selection.round < rnd,
+                )
+            )
+            .all()
+        )
+        for row in prev:
+            used_team_ids.add(row[0])
+            used_team_ids.add(row[1])
+        sel_cur = (
+            db.execute(
+                select(Selection).where(
+                    Selection.entry_id == entry_id,
+                    Selection.ticket_index == ticket.ticket_index,
+                    Selection.round == rnd,
+                )
+            )
+            .scalars().first()
+        )
+        selection_info = None
+        if sel_cur:
+            s = sel_cur
+            selection_info = {
+                "team1_id": s.team1_id,
+                "team2_id": s.team2_id,
+                "team1_name": s.team1.name,
+                "team2_name": s.team2.name,
+            }
+        tickets_out.append({
+            "ticket_index": ticket.ticket_index,
+            "status": ticket.status,
+            "stake_amount": float(ticket.stake_amount),
+            "used_team_ids": list(used_team_ids),
+            "selection": selection_info,
+        })
+    stake_legacy = entry.stake_amount if entry.stake_amount is not None else entry.stake
     return {
         "entry_id": entry_id,
         "round": rnd,
         "teams": [TeamItem(id=t.id, name=t.name) for t in teams_list],
         "matches": match_rows,
-        "used_team_ids": list(used_team_ids),
-        "stake": float(stake) if stake is not None else None,
+        "tickets": tickets_out,
+        "used_team_ids": list(tickets_out[0]["used_team_ids"]) if tickets_out else [],
+        "stake": float(stake_legacy) if stake_legacy is not None else None,
     }
 
 
 @app.post("/api/entry/{entry_id}/submit_teams")
 async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_db)):
-    """Save user's choice of 2 teams that will score this round. Replaces any previous selection for this round."""
+    """Зберегти вибір 2 команд для одного білета в цьому турі. Замінює попередній вибір для цього білета."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -485,21 +532,23 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
+    ticket_index = max(1, body.ticket_index or 1)
+    ticket = db.execute(
+        select(Ticket).where(Ticket.entry_id == entry_id, Ticket.ticket_index == ticket_index)
+    ).scalars().first()
+    if not ticket or ticket.status != "active":
+        raise HTTPException(status_code=400, detail="Білет не знайдено або вже вибув")
     matches = (
-        db.execute(
-            select(Match).where(Match.game_id == game.id, Match.round == rnd)
-        )
+        db.execute(select(Match).where(Match.game_id == game.id, Match.round == rnd))
         .scalars().all()
     )
-    allowed_ids: set[int] = set()
-    for m in matches:
-        allowed_ids.add(m.home_team_id)
-        allowed_ids.add(m.away_team_id)
-    used_team_ids: set[int] = set()
+    allowed_ids = {m.home_team_id for m in matches} | {m.away_team_id for m in matches}
+    used_team_ids = set()
     prev = (
         db.execute(
             select(Selection.team1_id, Selection.team2_id).where(
                 Selection.entry_id == entry_id,
+                Selection.ticket_index == ticket_index,
                 Selection.round < rnd,
             )
         )
@@ -511,13 +560,14 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     if body.team1_id not in allowed_ids or body.team2_id not in allowed_ids:
         raise HTTPException(status_code=400, detail="Обери дві команди зі списку цього туру")
     if body.team1_id in used_team_ids or body.team2_id in used_team_ids:
-        raise HTTPException(status_code=400, detail="Не можна вибирати команди з минулих турів")
+        raise HTTPException(status_code=400, detail="Не можна вибирати команди, які вже використовувались у цьому білеті")
     if body.team1_id == body.team2_id:
         raise HTTPException(status_code=400, detail="Обери дві різні команди")
     existing = (
         db.execute(
             select(Selection).where(
                 Selection.entry_id == entry_id,
+                Selection.ticket_index == ticket_index,
                 Selection.round == rnd,
             )
         )
@@ -525,9 +575,9 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     )
     for sel in existing:
         db.delete(sel)
-    db.add(Selection(entry_id=entry_id, round=rnd, team1_id=body.team1_id, team2_id=body.team2_id))
+    db.add(Selection(entry_id=entry_id, ticket_index=ticket_index, round=rnd, team1_id=body.team1_id, team2_id=body.team2_id))
     db.commit()
-    return {"ok": True, "round": rnd}
+    return {"ok": True, "round": rnd, "ticket_index": ticket_index}
 
 
 MIN_GOALS, MAX_GOALS = 0, 3
@@ -535,7 +585,7 @@ MIN_GOALS, MAX_GOALS = 0, 3
 
 @app.post("/api/entry/{entry_id}/run_round")
 async def run_round(entry_id: int, db=Depends(get_db)):
-    """Simulate round: generate goals if not yet done, check all entries, advance round. Returns result for this entry."""
+    """Симуляція туру: рахуємо білети всіх записів, повертаємо результат для цього entry."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -545,7 +595,7 @@ async def run_round(entry_id: int, db=Depends(get_db)):
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
-    sel_row = (
+    any_sel = (
         db.execute(
             select(Selection).where(
                 Selection.entry_id == entry_id,
@@ -554,9 +604,8 @@ async def run_round(entry_id: int, db=Depends(get_db)):
         )
         .scalars().first()
     )
-    if not sel_row:
-        raise HTTPException(status_code=400, detail="Спочатку обери дві команди для цього туру")
-    selection = sel_row
+    if not any_sel:
+        raise HTTPException(status_code=400, detail="Спочатку обери команди хоча б для одного білета")
     matches = (
         db.execute(
             select(Match)
@@ -575,31 +624,41 @@ async def run_round(entry_id: int, db=Depends(get_db)):
             m.away_goals = random.randint(MIN_GOALS, MAX_GOALS)
         scored_team_ids: set[int] = set()
         for m in matches:
-            if m.home_goals and m.home_goals >= 1:
+            if (m.home_goals or 0) >= 1:
                 scored_team_ids.add(m.home_team_id)
-            if m.away_goals and m.away_goals >= 1:
+            if (m.away_goals or 0) >= 1:
                 scored_team_ids.add(m.away_team_id)
-        entries_with_selection = (
+        rows = (
             db.execute(
-                select(Selection.entry_id, Selection.team1_id, Selection.team2_id).where(
+                select(Selection.entry_id, Selection.ticket_index, Selection.team1_id, Selection.team2_id).where(
                     Selection.round == rnd,
                 )
             )
             .all()
         )
-        for row in entries_with_selection:
-            eid, t1, t2 = row[0], row[1], row[2]
-            e = db.get(Entry, eid)
-            if not e:
+        for row in rows:
+            eid, tidx, t1, t2 = row[0], row[1], row[2], row[3]
+            ticket = db.execute(
+                select(Ticket).where(Ticket.entry_id == eid, Ticket.ticket_index == tidx)
+            ).scalars().first()
+            if not ticket or ticket.status != "active":
                 continue
-            if t1 not in scored_team_ids or t2 not in scored_team_ids:
-                e.status = "out"
-                _grant_achievement(db, e.user_id, "first_loss")
-            else:
-                # Пройшов тур — множимо ставку на 1.5 (10 → 15 → 22.5 → …)
-                e.stake_amount = (e.stake_amount if e.stake_amount is not None else e.stake or 10.0) * 1.5
-                if game.current_round >= 5:
+            if t1 in scored_team_ids and t2 in scored_team_ids:
+                ticket.stake_amount = ticket.stake_amount * 1.5
+                e = db.get(Entry, eid)
+                if e and game.current_round >= 5:
                     _grant_achievement(db, e.user_id, "survived_5_rounds")
+            else:
+                ticket.status = "out"
+                e = db.get(Entry, eid)
+                if e:
+                    _grant_achievement(db, e.user_id, "first_loss")
+                    still_active = (
+                        db.execute(select(Ticket).where(Ticket.entry_id == eid, Ticket.status == "active"))
+                        .scalars().first()
+                    )
+                    if not still_active:
+                        e.status = "out"
         game.current_round += 1
         db.commit()
         db.refresh(game)
@@ -608,51 +667,85 @@ async def run_round(entry_id: int, db=Depends(get_db)):
                 db.refresh(m)
     scored_team_ids = set()
     for m in matches:
-        if m.home_goals and m.home_goals >= 1:
+        if (m.home_goals or 0) >= 1:
             scored_team_ids.add(m.home_team_id)
-        if m.away_goals and m.away_goals >= 1:
+        if (m.away_goals or 0) >= 1:
             scored_team_ids.add(m.away_team_id)
-    your_t1 = selection.team1_id in scored_team_ids
-    your_t2 = selection.team2_id in scored_team_ids
-    passed = your_t1 and your_t2
-    match_items = [
-        MatchScoreItem(
-            home_name=m.home_team.name,
-            away_name=m.away_team.name,
-            home_goals=m.home_goals or 0,
-            away_goals=m.away_goals or 0,
+    selections_this_entry = (
+        db.execute(
+            select(Selection).where(
+                Selection.entry_id == entry_id,
+                Selection.round == rnd,
+            )
         )
-        for m in matches
-    ]
-    if passed:
-        msg = "Обидві ваші команди забили — ви проходите далі!"
-    else:
-        msg = "Одна або обидві команди не забили. Ви вибуваєте."
-    db.refresh(entry)
-    stake_after = float(entry.stake_amount) if entry.stake_amount is not None else None
+        .scalars().all()
+    )
+    ticket_results: list[TicketResultItem] = []
+    for sel in selections_this_entry:
+        ticket = db.execute(
+            select(Ticket).where(Ticket.entry_id == entry_id, Ticket.ticket_index == sel.ticket_index)
+        ).scalars().first()
+        if not ticket:
+            continue
+        t1_ok = sel.team1_id in scored_team_ids
+        t2_ok = sel.team2_id in scored_team_ids
+        passed = t1_ok and t2_ok
+        team_not = None
+        if not passed:
+            if not t1_ok and not t2_ok:
+                team_not = sel.team1.name + ", " + sel.team2.name
+            elif not t1_ok:
+                team_not = sel.team1.name
+            else:
+                team_not = sel.team2.name
+        ticket_results.append(
+            TicketResultItem(
+                ticket_index=sel.ticket_index,
+                passed=passed,
+                team1_name=sel.team1.name,
+                team2_name=sel.team2.name,
+                team1_scored=t1_ok,
+                team2_scored=t2_ok,
+                stake_after=float(ticket.stake_amount),
+                team_not_scored=team_not,
+            )
+        )
+    any_passed = any(t.passed for t in ticket_results)
+    active_tickets = (
+        db.execute(select(Ticket).where(Ticket.entry_id == entry_id, Ticket.status == "active"))
+        .scalars().all()
+    )
+    stake_total = sum(float(t.stake_amount) for t in active_tickets) if active_tickets else None
+    msg = "Хоч один білет пройшов — продовжуйте!" if any_passed else "Усі ваші білети вибули."
+    if not ticket_results:
+        msg = "Немає вибору для цього туру."
     return RoundResultResponse(
-        passed=passed,
+        passed=any_passed,
         round=rnd,
-        matches=match_items,
-        your_team1_scored=your_t1,
-        your_team2_scored=your_t2,
+        matches=[MatchScoreItem(home_name=m.home_team.name, away_name=m.away_team.name, home_goals=m.home_goals or 0, away_goals=m.away_goals or 0) for m in matches],
+        your_team1_scored=any(t.team1_scored for t in ticket_results),
+        your_team2_scored=any(t.team2_scored for t in ticket_results),
         message=msg,
-        stake_after_round=stake_after,
+        stake_after_round=stake_total,
+        tickets=ticket_results,
     )
 
 
 @app.post("/api/entry/{entry_id}/cash_out")
 async def cash_out(entry_id: int, db=Depends(get_db)):
-    """Забрати виграш: сума додається до балансу юзера, запис більше не активний."""
+    """Забрати виграш: сума всіх активних білетів додається до балансу."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     if entry.status != "active":
         raise HTTPException(status_code=400, detail="Запис не активний або виграш вже забрано")
-    amount = entry.stake_amount if entry.stake_amount is not None else entry.stake
-    if amount is None:
-        amount = 0.0
-    amount_float = float(amount)
+    active = (
+        db.execute(select(Ticket).where(Ticket.entry_id == entry_id, Ticket.status == "active"))
+        .scalars().all()
+    )
+    amount_float = sum(float(t.stake_amount) for t in active) if active else 0.0
+    if amount_float <= 0:
+        amount_float = float(entry.stake_amount or entry.stake or 0)
     user = db.get(User, entry.user_id)
     if user:
         user.balance = (user.balance or 0) + int(round(amount_float))

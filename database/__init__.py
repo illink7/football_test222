@@ -78,6 +78,44 @@ def _ensure_users_balance_column():
             conn.commit()
 
 
+def _ensure_selections_ticket_index():
+    """Add selections.ticket_index for підтримка кількох білетів."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('selections') WHERE name='ticket_index'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE selections ADD COLUMN ticket_index INTEGER NOT NULL DEFAULT 1"))
+            conn.commit()
+
+
+def _ensure_tickets_backfill():
+    """Для записів без білетів створити один білет (зворотна сумісність)."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SELECT 1 FROM tickets LIMIT 1"))
+        except Exception:
+            return  # таблиця tickets ще не існує
+        try:
+            entries = conn.execute(text("SELECT id, stake_amount, status FROM entries")).fetchall()
+        except Exception:
+            return
+        for row in entries:
+            eid, stake, status = row[0], row[1], row[2]
+            has = conn.execute(text("SELECT 1 FROM tickets WHERE entry_id = :eid"), {"eid": eid}).fetchone()
+            if has:
+                continue
+            stake_val = float(stake) if stake is not None else 10.0
+            ticket_status = "out" if status == "out" else "active"
+            conn.execute(
+                text("INSERT INTO tickets (entry_id, ticket_index, stake_amount, status) VALUES (:eid, 1, :stake, :status)"),
+                {"eid": eid, "stake": stake_val, "status": ticket_status},
+            )
+        conn.commit()
+
+
 def init_db():
     """Create all tables. Call on app startup."""
     from database import models  # noqa: F401 - register models
@@ -86,6 +124,8 @@ def init_db():
     _ensure_matches_goals_columns()
     _ensure_entries_stake_amount_column()
     _ensure_users_balance_column()
+    _ensure_selections_ticket_index()
+    _ensure_tickets_backfill()
 
 
 def seed_teams():
