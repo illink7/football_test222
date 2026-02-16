@@ -4,21 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Обрати дві команди — Survivor Football</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --tg-theme-bg-color: #1a1a2e;
-      --tg-theme-text-color: #eee;
-      --tg-theme-button-color: #0f3460;
-      --accent: #e94560;
-      --success: #4ecca3;
-      --card-bg: rgba(255,255,255,0.06);
-      --card-border: rgba(255,255,255,0.12);
+      --pitch: #0d1f0d;
+      --grass: #143814;
+      --gold: #d4a84b;
+      --gold-light: #e8c97a;
+      --accent: #c9302c;
+      --success: #2d8a47;
+      --card-bg: rgba(20, 56, 20, 0.85);
+      --card-border: rgba(212, 168, 75, 0.35);
+      --tg-theme-bg-color: var(--pitch);
+      --tg-theme-text-color: #e8e0c8;
     }
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--tg-theme-bg-color);
+      font-family: 'Outfit', -apple-system, sans-serif;
+      background: var(--pitch);
+      background-image: radial-gradient(ellipse at 50% 0%, rgba(45, 138, 71, 0.12) 0%, transparent 50%),
+        linear-gradient(180deg, var(--grass) 0%, var(--pitch) 100%);
       color: var(--tg-theme-text-color);
       margin: 0;
       padding: 0;
@@ -27,18 +35,19 @@
     .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
     .header {
       text-align: center;
-      padding: 16px 0 20px;
+      padding: 20px 0 24px;
       border-bottom: 1px solid var(--card-border);
     }
-    .header h1 { font-size: 1.35rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .header h1 { font-family: 'Pirata One', cursive; font-size: 1.6rem; margin: 0; color: var(--gold); letter-spacing: 0.02em; }
     .round-badge {
       display: inline-block;
       font-size: 0.85rem;
-      opacity: 0.85;
-      margin-top: 8px;
-      padding: 6px 12px;
+      margin-top: 10px;
+      padding: 8px 14px;
       background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: 20px;
+      color: var(--gold-light);
     }
     .intro {
       text-align: center;
@@ -49,8 +58,8 @@
     }
     .content { padding: 8px 0 20px; }
     .loading { text-align: center; padding: 40px 20px; opacity: 0.9; }
-    .error { color: #e94560; padding: 16px; text-align: center; background: rgba(233,69,96,0.1); border-radius: 12px; margin-bottom: 16px; }
-    .info { color: #8cf; padding: 16px; text-align: center; line-height: 1.5; }
+    .error { color: var(--accent); padding: 16px; text-align: center; background: rgba(201,48,44,0.15); border-radius: 12px; margin-bottom: 16px; border: 1px solid rgba(201,48,44,0.3); }
+    .info { color: var(--gold-light); padding: 16px; text-align: center; line-height: 1.5; }
     .team-row {
       display: flex;
       align-items: center;
@@ -69,7 +78,7 @@
       border-color: var(--success);
     }
     .team-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-    .team-row.selected .check { background: var(--success); border-color: var(--success); color: #1a1a2e; }
+    .team-row.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
     .team-row.used { background: rgba(233, 69, 96, 0.2); border-color: rgba(233, 69, 96, 0.5); cursor: not-allowed; opacity: 0.9; }
     .team-row.used .name { opacity: 0.9; }
     .team-row .name { flex: 1; font-size: 1rem; }
@@ -90,7 +99,7 @@
       transition: opacity 0.2s, transform 0.05s;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-success { background: var(--success); color: #1a1a2e; }
+    .btn-success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(45,138,71,0.2); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .success-screen { text-align: center; padding: 32px 20px; }
     .success-screen .icon { font-size: 3rem; margin-bottom: 16px; }
@@ -108,15 +117,15 @@
     .results-screen .message.out { color: var(--accent); }
     .match-score { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; margin-bottom: 8px; background: var(--card-bg); border-radius: 10px; font-size: 0.95rem; }
     .match-score .score { font-weight: 600; margin: 0 8px; }
-    .btn-next { margin-top: 20px; background: var(--success); color: #1a1a2e; }
+    .btn-next { margin-top: 20px; background: var(--success); color: #fff; }
     .btn-row { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
     .btn-row .btn { margin-top: 0; }
     .btn-outline { background: transparent; border: 2px solid var(--success); color: var(--success); }
     .win-screen { text-align: center; padding: 28px 20px; }
     .win-screen .icon { font-size: 3rem; margin-bottom: 12px; }
     .win-screen h2 { font-size: 1.25rem; margin: 0 0 8px; }
-    .win-screen .amount { font-size: 1.5rem; font-weight: 700; color: var(--success); margin: 16px 0; }
-    .stake-line { font-size: 0.95rem; color: var(--success); font-weight: 600; margin-top: 8px; }
+    .win-screen .amount { font-family: 'Pirata One', cursive; font-size: 1.8rem; color: var(--gold); margin: 16px 0; }
+    .stake-line { font-size: 0.95rem; color: var(--gold); font-weight: 600; margin-top: 8px; }
     .stake-line .muted { font-weight: normal; opacity: 0.85; font-size: 0.85rem; }
   </style>
 </head>

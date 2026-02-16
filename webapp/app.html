@@ -195,6 +195,9 @@
     .history-result.loss { color: var(--accent); }
     .history-result.active { color: var(--gold); }
     .soon { font-size: 0.75rem; opacity: 0.8; font-weight: normal; }
+    .quick-league-btns { display: flex; flex-direction: column; gap: 10px; }
+    .btn-quick-league { margin-top: 0; font-size: 0.95rem; padding: 12px 16px; background: var(--wood); color: var(--gold-light); border: 1px solid var(--card-border); }
+    .btn-quick-league:active { background: rgba(212, 168, 75, 0.2); }
   </style>
 </head>
 <body>
@@ -235,8 +238,15 @@
             <select id="setTeamsGameId"><option value="">— оберіть гру —</option></select>
           </div>
           <div class="form-row">
-            <label class="field-label">2. Список 20 команд (по одній на рядок)</label>
-            <textarea id="setTeamsText" rows="12" placeholder="Вулверхэмптон&#10;Арсенал&#10;Борнмут&#10;Ман Юнайтед&#10;Брайтон&#10;Ливерпуль&#10;Фулхэм&#10;Бернли&#10;Ман Сити&#10;Кристал Пэлас&#10;Эвертон&#10;Челси&#10;Лидс&#10;Брентфорд&#10;Ньюкасл&#10;Сандерленд&#10;Астон Вилла&#10;Вест Хэм&#10;Тоттенхэм&#10;Ноттингем Форест"></textarea>
+            <label class="field-label">2. Швидкі ліги — вставити 20 команд</label>
+            <div class="quick-league-btns">
+              <button type="button" class="btn btn-quick-league" id="btnLeagueEPL">🏴 Англійська Прем'єр-ліга</button>
+              <button type="button" class="btn btn-quick-league" id="btnLeagueLaLiga">🇪🇸 Ла Ліга</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="field-label">3. Список 20 команд (по одній на рядок)</label>
+            <textarea id="setTeamsText" rows="12" placeholder="Натисніть кнопку ліги вище або введіть вручну..."></textarea>
           </div>
           <p class="hint">Система автоматично згенерує 10 турів по 10 матчів (пари тасуються кожен тур). Старі матчі гри будуть замінені.</p>
           <p id="setTeamsError" class="hint error-inline" style="display:none;"></p>
@@ -334,6 +344,17 @@
   const loadingEl = document.getElementById('loading');
   const errorEl = document.getElementById('error');
 
+  var LEAGUE_EPL = [
+    'Арсенал', 'Манчестер Сити', 'Астон Вилла', 'Манчестер Юнайтед', 'Челси', 'Ливерпуль',
+    'Брентфорд', 'Эвертон', 'Борнмут', 'Ньюкасл', 'Сандерленд', 'Фулхэм', 'Кристал Пэлас',
+    'Брайтон', 'Лидс Юнайтед', 'Тоттенхэм', 'Ноттингем Форест', 'Вест Хэм', 'Бернли', 'Вулверхэмптон'
+  ];
+  var LEAGUE_LALIGA = [
+    'Реал Мадрид', 'Барселона', 'Вильярреал', 'Атлетико Мадрид', 'Бетис', 'Эспаньол', 'Сельта',
+    'Реал Сосьедад', 'Атлетик', 'Осасуна', 'Хетафе', 'Севилья', 'Алавес', 'Валенсия', 'Жирона',
+    'Эльче', 'Райо Вальекано', 'Мальорка', 'Леванте', 'Реал Овьедо'
+  ];
+
   function showError(msg) {
     errorEl.textContent = msg;
     errorEl.style.display = 'block';
@@ -385,6 +406,14 @@
       document.getElementById('btnCreateGame').onclick = createGame;
       document.getElementById('btnSetTeams').onclick = setTeams;
       document.getElementById('btnAddMatches').onclick = addMatches;
+      document.getElementById('btnLeagueEPL').onclick = function () {
+        document.getElementById('setTeamsText').value = LEAGUE_EPL.join('\n');
+        if (tg) tg.showAlert('Вставлено 20 команд Англійської Прем\'єр-ліги. Оберіть гру та натисніть «Згенерувати 10 турів».');
+      };
+      document.getElementById('btnLeagueLaLiga').onclick = function () {
+        document.getElementById('setTeamsText').value = LEAGUE_LALIGA.join('\n');
+        if (tg) tg.showAlert('Вставлено 20 команд Ла Ліги. Оберіть гру та натисніть «Згенерувати 10 турів».');
+      };
     } else {
       const balance = me.balance != null ? Number(me.balance) : 1000;
       document.getElementById('balanceValue').textContent = balance;
