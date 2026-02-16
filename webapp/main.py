@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY, TON_CENTER_API_KEY, TON_CENTER_BASE_URL, TON_NETWORK, TON_RECEIVE_WALLET, WEBAPP_BASE_URL
+from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY, TON_CENTER_API_KEY, TON_CENTER_BASE_URL, TON_NETWORK, TON_RECEIVE_WALLET, TON_TEST_MODE, WEBAPP_BASE_URL
 from database import get_db
 from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, Ticket, TonTransaction, User, UserAchievement
 from webapp.telegram_auth import get_user_id_from_init_data
@@ -980,11 +980,6 @@ async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get
 @app.post("/api/deposit")
 async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
     """Створити запит на поповнення балансу через TON."""
-    if not TON_RECEIVE_WALLET:
-        raise HTTPException(
-            status_code=400,
-            detail="TON wallet не налаштовано. Додайте TON_RECEIVE_WALLET у змінні середовища.",
-        )
     user = db.get(User, uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -998,6 +993,29 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
         raise HTTPException(status_code=400, detail="Сума має бути більше 0")
     tx_id = str(uuid.uuid4())
     comment = f"deposit_{uid}_{tx_id[:8]}"
+    
+    # Тестовий режим: автоматично підтверджуємо без перевірки блокчейну
+    if TON_TEST_MODE:
+        user.balance = (user.balance or 0) + int(amount_float)
+        db.add(TonTransaction(tx_hash=f"test_{tx_id}", user_id=uid, amount=amount_float, comment=comment))
+        db.commit()
+        return {
+            "ok": True,
+            "transaction_id": tx_id,
+            "payment_link": None,
+            "amount": amount_float,
+            "wallet": None,
+            "comment": comment,
+            "test_mode": True,
+            "balance": user.balance,
+        }
+    
+    # Продакшн режим: генеруємо посилання для оплати
+    if not TON_RECEIVE_WALLET:
+        raise HTTPException(
+            status_code=400,
+            detail="TON wallet не налаштовано. Додайте TON_RECEIVE_WALLET у змінні середовища.",
+        )
     amount_nano = int(amount_float * 1_000_000_000)  # 1 поінт = 1 TON (в нанотонах)
     payment_link = f"ton://transfer/{TON_RECEIVE_WALLET}?amount={amount_nano}&text={comment}"
     return {
@@ -1007,6 +1025,7 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
         "amount": amount_float,
         "wallet": TON_RECEIVE_WALLET,
         "comment": comment,
+        "test_mode": False,
     }
 
 
@@ -1027,14 +1046,42 @@ async def withdraw(body: WithdrawBody, uid: int = Depends(get_current_user), db=
     return {"ok": True, "amount": body.amount, "balance": user.balance}
 
 
+@app.post("/api/admin/confirm_deposit")
+async def admin_confirm_deposit(
+    tx_id: str = Query(...),
+    user_id: int = Query(...),
+    amount: float = Query(...),
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Адмін: ручно підтвердити депозит (для тестування)."""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Транзакція вже підтверджена")
+    user.balance = (user.balance or 0) + int(amount)
+    db.add(TonTransaction(tx_hash=f"test_{tx_id}", user_id=user_id, amount=amount, comment=f"admin_confirm_{tx_id}"))
+    db.commit()
+    return {"ok": True, "amount": amount, "balance": user.balance}
+
+
 @app.get("/api/check_transaction/{tx_id}")
 async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db=Depends(get_db)):
     """Перевірити транзакцію TON через TON Center API."""
-    if not TON_CENTER_API_KEY or not TON_RECEIVE_WALLET:
-        raise HTTPException(status_code=400, detail="TON Center API not configured")
     user = db.get(User, uid)
     if not user or not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="User or wallet not found")
+    
+    # Перевірити чи це тестова транзакція
+    test_tx = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
+    if test_tx:
+        return {"confirmed": True, "amount": test_tx.amount, "balance": user.balance}
+    
+    # Реальна перевірка через TON Center API
+    if not TON_CENTER_API_KEY or not TON_RECEIVE_WALLET:
+        return {"confirmed": False, "message": "TON Center API not configured"}
     try:
         url = f"{TON_CENTER_BASE_URL}getTransactions?address={TON_RECEIVE_WALLET}&limit=30&archival=true&api_key={TON_CENTER_API_KEY}"
         req = urllib.request.Request(url)
@@ -1062,7 +1109,7 @@ async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db
                 return {"confirmed": True, "amount": amount_ton, "balance": user.balance}
         return {"confirmed": False}
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Помилка перевірки транзакції: " + str(e))
+        return {"confirmed": False, "error": str(e)}
 
 
 @app.post("/api/admin/fetch_bundesliga_round")

@@ -33,3 +33,6 @@ TON_NETWORK: str = os.getenv("TON_NETWORK", "mainnet")  # mainnet or testnet
 
 # TON wallet for receiving payments (admin wallet)
 TON_RECEIVE_WALLET: str | None = os.getenv("TON_RECEIVE_WALLET") or None
+
+# Test mode: if True, deposits are auto-confirmed without checking blockchain (for testing)
+TON_TEST_MODE: bool = os.getenv("TON_TEST_MODE", "false").lower() == "true"

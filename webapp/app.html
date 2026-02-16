@@ -609,7 +609,10 @@
         else alert(msg);
         return;
       }
-      if (data.payment_link) {
+      if (data.test_mode) {
+        if (tg) tg.showAlert('Баланс поповнено (тестовий режим): +' + amount + ' поінтів');
+        loadMe();
+      } else if (data.payment_link) {
         var link = data.payment_link;
         if (tg && tg.openLink) {
           tg.openLink(link);
