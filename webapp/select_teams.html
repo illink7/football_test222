@@ -82,6 +82,33 @@
     .team-row.used { background: rgba(233, 69, 96, 0.2); border-color: rgba(233, 69, 96, 0.5); cursor: not-allowed; opacity: 0.9; }
     .team-row.used .name { opacity: 0.9; }
     .team-row .name { flex: 1; font-size: 1rem; }
+    .match-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 14px 18px;
+      margin-bottom: 8px;
+      background: var(--card-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 14px;
+    }
+    .match-row .vs { opacity: 0.7; font-weight: 600; }
+    .team-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      border: 2px solid transparent;
+    }
+    .team-btn .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+    .team-btn.selected { background: rgba(78, 204, 163, 0.2); border-color: var(--success); }
+    .team-btn.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
+    .team-btn.used { opacity: 0.7; cursor: not-allowed; }
+    .team-btn:active:not(.used) { opacity: 0.95; }
     .counter { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; text-align: center; }
     .btn {
       display: flex;
@@ -197,9 +224,36 @@
     return r.json();
   }
 
+    function toggleTeamSelection(teamId, usedSet) {
+    if (usedSet.has(teamId)) return;
+    const idx = selectedIds.indexOf(teamId);
+    if (idx >= 0) {
+      selectedIds.splice(idx, 1);
+    } else if (selectedIds.length < 2) {
+      selectedIds.push(teamId);
+    }
+    updateSelectionUI(usedSet);
+  }
+
+  function updateSelectionUI(usedSet) {
+    document.querySelectorAll('.team-btn.selected, .team-row.selected').forEach(function (el) {
+      el.classList.remove('selected');
+    });
+    document.querySelectorAll('.team-btn .check, .team-row .check').forEach(function (el) { el.textContent = ''; });
+    selectedIds.forEach(function (id) {
+      const btn = document.querySelector('.team-btn[data-team-id="' + id + '"]');
+      const row = document.querySelector('.team-row[data-team-id="' + id + '"]');
+      if (btn) { btn.classList.add('selected'); const c = btn.querySelector('.check'); if (c) c.textContent = '✓'; }
+      if (row) { row.classList.add('selected'); const c = row.querySelector('.check'); if (c) c.textContent = '✓'; }
+    });
+    counterEl.textContent = 'Обрано: ' + selectedIds.length + ' з 2';
+    submitBtn.disabled = selectedIds.length !== 2;
+  }
+
   function renderTeamList(data) {
     teamsData = data.teams || [];
     const usedSet = new Set((data.used_team_ids || []).map(Number));
+    const matches = data.matches || [];
     roundEl.textContent = 'Тур ' + data.round;
     roundEl.style.display = 'inline-block';
     if (data.stake != null) {
@@ -209,44 +263,52 @@
       stakeLineEl.style.display = 'none';
     }
 
-    if (teamsData.length === 0) {
-      contentEl.innerHTML = '<p class="info">Команди для цього туру ще не додано. Адмін додасть матчі — тоді з\'явиться список команд. Оновіть сторінку пізніше.</p>';
+    if (teamsData.length === 0 && matches.length === 0) {
+      contentEl.innerHTML = '<p class="info">Команди для цього туру ще не додано. Адмін додасть матчі — тоді з\'явиться список. Оновіть сторінку пізніше.</p>';
       submitBtn.style.display = 'none';
       counterEl.style.display = 'none';
       return;
     }
 
     selectedIds = [];
-    const html = teamsData.map(t => {
-      const used = usedSet.has(t.id);
-      const cls = 'team-row' + (used ? ' used' : '');
-      return '<div class="' + cls + '" data-team-id="' + t.id + '" data-used="' + (used ? '1' : '0') + '" role="button" tabindex="0">' +
-        '<span class="check"></span>' +
-        '<span class="name">' + escapeHtml(t.name) + (used ? ' (вже використовувалась)' : '') + '</span>' +
-      '</div>';
-    }).join('');
+    let html = '';
+    if (matches.length > 0) {
+      html = matches.map(function (m) {
+        const homeUsed = usedSet.has(m.home_id);
+        const awayUsed = usedSet.has(m.away_id);
+        return '<div class="match-row">' +
+          '<span class="team-btn' + (homeUsed ? ' used' : '') + '" data-team-id="' + m.home_id + '" data-used="' + (homeUsed ? '1' : '0') + '" role="button" tabindex="0">' +
+            '<span class="check"></span>' + escapeHtml(m.home_name) + (homeUsed ? ' (вик.)' : '') +
+          '</span>' +
+          ' <span class="vs">—</span> ' +
+          '<span class="team-btn' + (awayUsed ? ' used' : '') + '" data-team-id="' + m.away_id + '" data-used="' + (awayUsed ? '1' : '0') + '" role="button" tabindex="0">' +
+            '<span class="check"></span>' + escapeHtml(m.away_name) + (awayUsed ? ' (вик.)' : '') +
+          '</span>' +
+        '</div>';
+      }).join('');
+    } else {
+      html = teamsData.map(t => {
+        const used = usedSet.has(t.id);
+        const cls = 'team-row' + (used ? ' used' : '');
+        return '<div class="' + cls + '" data-team-id="' + t.id + '" data-used="' + (used ? '1' : '0') + '" role="button" tabindex="0">' +
+          '<span class="check"></span>' +
+          '<span class="name">' + escapeHtml(t.name) + (used ? ' (вже використовувалась)' : '') + '</span>' +
+        '</div>';
+      }).join('');
+    }
     contentEl.innerHTML = html;
     counterEl.style.display = 'block';
     counterEl.textContent = 'Обрано: 0 з 2';
     submitBtn.style.display = 'block';
     submitBtn.disabled = true;
 
+    contentEl.querySelectorAll('.team-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) { e.preventDefault(); toggleTeamSelection(parseInt(this.dataset.teamId, 10), usedSet); });
+    });
     contentEl.querySelectorAll('.team-row').forEach(row => {
       row.addEventListener('click', function () {
         if (this.dataset.used === '1') return;
-        const id = parseInt(this.dataset.teamId, 10);
-        const idx = selectedIds.indexOf(id);
-        if (idx >= 0) {
-          selectedIds.splice(idx, 1);
-          this.classList.remove('selected');
-          this.querySelector('.check').textContent = '';
-        } else if (selectedIds.length < 2) {
-          selectedIds.push(id);
-          this.classList.add('selected');
-          this.querySelector('.check').textContent = '✓';
-        }
-        counterEl.textContent = 'Обрано: ' + selectedIds.length + ' з 2';
-        submitBtn.disabled = selectedIds.length !== 2;
+        toggleTeamSelection(parseInt(this.dataset.teamId, 10), usedSet);
       });
     });
   }

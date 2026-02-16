@@ -198,6 +198,13 @@
     .quick-league-btns { display: flex; flex-direction: column; gap: 10px; }
     .btn-quick-league { margin-top: 0; font-size: 0.95rem; padding: 12px 16px; background: var(--wood); color: var(--gold-light); border: 1px solid var(--card-border); }
     .btn-quick-league:active { background: rgba(212, 168, 75, 0.2); }
+    .achievements-wrap { display: flex; flex-wrap: wrap; gap: 10px; }
+    .achievement-badge {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px;
+      background: var(--card-bg); border: 1px solid var(--card-border); font-size: 0.9rem;
+    }
+    .achievement-badge.locked { opacity: 0.5; }
+    .achievement-badge .icon { font-size: 1.2rem; }
   </style>
 </head>
 <body>
@@ -228,6 +235,15 @@
       <section class="section">
         <h2 class="section-title">🎮 Ваші ігри</h2>
         <div id="gamesList"></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">🇩🇪 Бундесліга (BL1)</h2>
+        <div class="card">
+          <p class="hint">Підтягнути поточний тур з <a href="https://www.football-data.org/" target="_blank" rel="noopener">Football-Data.org</a>. Потрібен API ключ (FOOTBALL_DATA_API_KEY). Створиться або оновиться гра «Bundesliga» і матчі поточного туру.</p>
+          <p id="fetchBl1Error" class="hint error-inline" style="display:none;"></p>
+          <button type="button" id="btnFetchBundesliga" class="btn btn-primary">Підтягнути тур Бундесліги</button>
+        </div>
       </section>
 
       <section class="section">
@@ -317,6 +333,10 @@
             <button type="button" class="btn btn-success" id="btnAddBalance" disabled title="Скоро">Додати баланс <span class="soon">(скоро)</span></button>
             <button type="button" class="btn btn-secondary" id="btnWithdraw" disabled title="Скоро">Вивести баланс <span class="soon">(скоро)</span></button>
           </div>
+        </section>
+        <section class="section">
+          <h2 class="section-title">🏅 Досягнення</h2>
+          <div id="profileAchievements" class="achievements-wrap"></div>
         </section>
         <section class="section">
           <h2 class="section-title">📜 Історія ставок</h2>
@@ -414,6 +434,7 @@
         document.getElementById('setTeamsText').value = LEAGUE_LALIGA.join('\n');
         if (tg) tg.showAlert('Вставлено 20 команд Ла Ліги. Оберіть гру та натисніть «Згенерувати 10 турів».');
       };
+      document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
     } else {
       const balance = me.balance != null ? Number(me.balance) : 1000;
       document.getElementById('balanceValue').textContent = balance;
@@ -424,9 +445,37 @@
       document.getElementById('btnJoin').onclick = joinGame;
       renderEntriesList(me.entries || [], me.games || []);
       renderProfileHistory(me.entries || []);
+      renderAchievements(me.achievements || []);
       document.getElementById('tabBets').onclick = function () { switchTab('bets'); };
       document.getElementById('tabProfile').onclick = function () { switchTab('profile'); };
     }
+  }
+
+  var ACHIEVEMENT_LABELS = {
+    first_bet: 'Перша ставка',
+    first_loss: 'Перша програна ставка',
+    cashed_out_100: 'Забрав 100+ поінтів',
+    cashed_out_500: 'Забрав 500+ поінтів',
+    survived_5_rounds: 'Пройшов 5 турів'
+  };
+
+  function renderAchievements(achievements) {
+    const el = document.getElementById('profileAchievements');
+    if (!el) return;
+    const keys = Object.keys(ACHIEVEMENT_LABELS);
+    const unlockedSet = new Set((achievements || []).map(function (a) { return a.key; }));
+    if (keys.length === 0) {
+      el.innerHTML = '<p class="hint">Досягнення з\'являться тут.</p>';
+      return;
+    }
+    el.innerHTML = keys.map(function (key) {
+      const unlocked = unlockedSet.has(key);
+      const label = ACHIEVEMENT_LABELS[key] || key;
+      return '<span class="achievement-badge' + (unlocked ? '' : ' locked') + '" title="' + escapeHtml(label) + '">' +
+        '<span class="icon">' + (unlocked ? '🏆' : '🔒') + '</span>' +
+        '<span>' + escapeHtml(label) + '</span>' +
+      '</span>';
+    }).join('');
   }
 
   const STAKE_OPTIONS = [10, 20, 50, 100, 200];
@@ -583,6 +632,28 @@
       if (tg) tg.showAlert('Згенеровано 10 турів по 10 матчів. Старі матчі гри замінені.');
       previewEl.style.display = 'block';
       previewEl.innerHTML = '<div class="preview-title">Готово: 10 турів, у кожному по 10 матчів (пари змішані для кожного туру).</div>';
+      loadMe();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      if (tg) tg.showAlert(e.message);
+    }
+  }
+
+  async function fetchBundesligaRound() {
+    const errEl = document.getElementById('fetchBl1Error');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    try {
+      const r = await fetch(baseUrl + '/api/admin/fetch_bundesliga_round', { method: 'POST', headers: authHeaders() });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        errEl.textContent = data.detail || 'Помилка';
+        errEl.style.display = 'block';
+        if (tg) tg.showAlert(data.detail || 'Помилка');
+        return;
+      }
+      if (tg) tg.showAlert('Готово: ' + (data.title || 'Bundesliga') + ', тур ' + data.matchday + ', матчів: ' + (data.matches_count || 0));
       loadMe();
     } catch (e) {
       errEl.textContent = e.message;

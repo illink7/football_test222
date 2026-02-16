@@ -2,7 +2,9 @@
 FastAPI app for Telegram Web App: team selection and APIs.
 Bot is started separately in main.py via asyncio.gather (same process).
 """
+import json
 import random
+import urllib.request
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
@@ -11,9 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from config import BOT_TOKEN, ADMIN_ID
+from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY
 from database import get_db
-from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, User
+from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, User, UserAchievement
 from webapp.telegram_auth import get_user_id_from_init_data
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -129,6 +131,17 @@ def require_admin(uid: int = Depends(get_current_user)):
     return uid
 
 
+def _grant_achievement(db, user_id: int, key: str) -> bool:
+    """Розблокувати досягнення, якщо ще не має. Повертає True якщо надано."""
+    exists = db.execute(
+        select(UserAchievement).where(UserAchievement.user_id == user_id, UserAchievement.achievement_key == key)
+    ).scalars().first()
+    if exists:
+        return False
+    db.add(UserAchievement(user_id=user_id, achievement_key=key))
+    return True
+
+
 # ----- Endpoints -----
 
 
@@ -197,6 +210,11 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
         {"id": g.id, "title": g.title, "current_round": g.current_round, "rounds_total": g.rounds_total, "status": g.status}
         for g in games
     ]
+    achievements = (
+        db.execute(select(UserAchievement.achievement_key, UserAchievement.unlocked_at).where(UserAchievement.user_id == uid).order_by(UserAchievement.unlocked_at))
+        .all()
+    )
+    result["achievements"] = [{"key": a[0], "unlocked_at": a[1].isoformat() if getattr(a[1], "isoformat", None) else str(a[1])} for a in achievements]
     return result
 
 
@@ -229,6 +247,8 @@ async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db
     user.balance -= stake_int
     entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=float(stake_int))
     db.add(entry)
+    db.flush()
+    _grant_achievement(db, uid, "first_bet")
     db.commit()
     db.refresh(entry)
     db.refresh(user)
@@ -434,10 +454,20 @@ async def get_teams_for_round(entry_id: int, db=Depends(get_db)):
                 if t:
                     teams_list.append(t)
     stake = entry.stake_amount if entry.stake_amount is not None else entry.stake
+    match_rows = [
+        {
+            "home_id": m.home_team_id,
+            "home_name": m.home_team.name,
+            "away_id": m.away_team_id,
+            "away_name": m.away_team.name,
+        }
+        for m in matches
+    ]
     return {
         "entry_id": entry_id,
         "round": rnd,
         "teams": [TeamItem(id=t.id, name=t.name) for t in teams_list],
+        "matches": match_rows,
         "used_team_ids": list(used_team_ids),
         "stake": float(stake) if stake is not None else None,
     }
@@ -564,9 +594,12 @@ async def run_round(entry_id: int, db=Depends(get_db)):
                 continue
             if t1 not in scored_team_ids or t2 not in scored_team_ids:
                 e.status = "out"
+                _grant_achievement(db, e.user_id, "first_loss")
             else:
                 # Пройшов тур — множимо ставку на 1.5 (10 → 15 → 22.5 → …)
                 e.stake_amount = (e.stake_amount if e.stake_amount is not None else e.stake or 10.0) * 1.5
+                if game.current_round >= 5:
+                    _grant_achievement(db, e.user_id, "survived_5_rounds")
         game.current_round += 1
         db.commit()
         db.refresh(game)
@@ -624,6 +657,11 @@ async def cash_out(entry_id: int, db=Depends(get_db)):
     if user:
         user.balance = (user.balance or 0) + int(round(amount_float))
     entry.status = "cashed_out"
+    if user:
+        if amount_float >= 500:
+            _grant_achievement(db, user.tg_id, "cashed_out_500")
+        if amount_float >= 100:
+            _grant_achievement(db, user.tg_id, "cashed_out_100")
     db.commit()
     new_balance = user.balance if user else None
     return {"ok": True, "amount": amount_float, "balance": new_balance}
@@ -784,6 +822,99 @@ async def api_add_entry(body: EntryAdd, db=Depends(get_db), uid: int = Depends(r
     db.commit()
     db.refresh(entry)
     return {"entry_id": entry.id, "game_id": game.id, "user_id": user_id}
+
+
+@app.post("/api/admin/fetch_bundesliga_round")
+async def fetch_bundesliga_round(db=Depends(get_db), _admin: int = Depends(require_admin)):
+    """Підтягнути поточний тур Бундесліги з Football-Data.org: створити/оновити гру Bundesliga та матчі поточного туру."""
+    if not FOOTBALL_DATA_API_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Додайте FOOTBALL_DATA_API_KEY у змінні середовища (реєстрація на football-data.org).",
+        )
+    headers = {"X-Auth-Token": FOOTBALL_DATA_API_KEY, "Accept": "application/json"}
+    try:
+        req = urllib.request.Request(
+            "https://api.football-data.org/v4/competitions/BL1",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            comp = json.loads(resp.read().decode())
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Не вдалося отримати BL1: " + str(e))
+    current = comp.get("currentSeason") or {}
+    matchday = current.get("currentMatchday")
+    if matchday is None:
+        matchday = current.get("currentMatchday", 1)
+    if not isinstance(matchday, int) or matchday < 1:
+        matchday = 1
+    try:
+        req2 = urllib.request.Request(
+            f"https://api.football-data.org/v4/competitions/BL1/matches?matchday={matchday}",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req2, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception as e:
+        raise HTTPException(status_code=502, detail="Не вдалося отримати матчі: " + str(e))
+    matches_data = data.get("matches") or data if isinstance(data, list) else []
+    if not matches_data and isinstance(data, dict):
+        matches_data = data.get("matches") or []
+    game = db.execute(select(Game).where(Game.title == "Bundesliga")).scalars().first()
+    if not game:
+        game = Game(title="Bundesliga", rounds_total=34, current_round=matchday, status="active")
+        db.add(game)
+        db.flush()
+    game.current_round = matchday
+    game.status = "active"
+    existing_teams = {t.name: t for t in db.execute(select(Team)).scalars().all()}
+    def get_or_create_team(name: str):
+        if not name:
+            return None
+        if name in existing_teams:
+            return existing_teams[name]
+        team = Team(name=name)
+        db.add(team)
+        db.flush()
+        existing_teams[name] = team
+        return team
+    old_matches = (
+        db.execute(select(Match).where(Match.game_id == game.id, Match.round == matchday))
+        .scalars().all()
+    )
+    for m in old_matches:
+        db.delete(m)
+    for m in matches_data:
+        home_name = (m.get("homeTeam") or {}).get("name") or (m.get("homeTeam") or {}).get("shortName") or ""
+        away_name = (m.get("awayTeam") or {}).get("name") or (m.get("awayTeam") or {}).get("shortName") or ""
+        if not home_name or not away_name:
+            continue
+        home_team = get_or_create_team(home_name)
+        away_team = get_or_create_team(away_name)
+        if not home_team or not away_team:
+            continue
+        score = (m.get("score") or {}).get("fullTime") or {}
+        home_goals = score.get("home")
+        away_goals = score.get("away")
+        db.add(
+            Match(
+                game_id=game.id,
+                round=matchday,
+                home_team_id=home_team.id,
+                away_team_id=away_team.id,
+                home_goals=int(home_goals) if home_goals is not None else None,
+                away_goals=int(away_goals) if away_goals is not None else None,
+            )
+        )
+    db.commit()
+    db.refresh(game)
+    return {
+        "ok": True,
+        "game_id": game.id,
+        "title": game.title,
+        "matchday": matchday,
+        "matches_count": len(matches_data),
+    }
 
 
 if __name__ == "__main__":

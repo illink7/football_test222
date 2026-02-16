@@ -1,8 +1,9 @@
 """
 SQLAlchemy models for Survivor Football game.
 """
-from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, DateTime, Enum as SQLEnum
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 from database import Base
 
@@ -16,6 +17,19 @@ class User(Base):
     balance = Column(Integer, default=1000)  # поінты (грн), 1000 при першому заході
 
     entries = relationship("Entry", back_populates="user", lazy="selectin")
+    achievements = relationship("UserAchievement", back_populates="user", lazy="selectin")
+
+
+class UserAchievement(Base):
+    """Досягнення гравця: first_bet, first_loss, cashed_out_100, cashed_out_500, survived_5_rounds, etc."""
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.tg_id"), nullable=False)
+    achievement_key = Column(String(64), nullable=False)  # first_bet, first_loss, cashed_out_100, ...
+    unlocked_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="achievements")
 
 
 class Game(Base):
