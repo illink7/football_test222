@@ -528,7 +528,7 @@
       };
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
     } else {
-      const balance = me.balance != null ? Number(me.balance) : 1000;
+      const balance = me.balance != null ? Number(me.balance) : 0;
       document.getElementById('balanceValue').textContent = balance;
       var pv = document.getElementById('profileBalanceValue');
       if (pv) { pv.innerHTML = balance + ' <span>поінтів</span>'; }

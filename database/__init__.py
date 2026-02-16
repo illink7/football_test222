@@ -67,14 +67,14 @@ def _ensure_entries_stake_amount_column():
 
 
 def _ensure_users_balance_column():
-    """Add users.balance if missing; new users get 1000 поінтів."""
+    """Add users.balance if missing; new users get 0 поінтів (потрібно поповнити)."""
     if "sqlite" not in DATABASE_URL:
         return
     with engine.connect() as conn:
         r = conn.execute(text("SELECT 1 FROM pragma_table_info('users') WHERE name='balance'"))
         if r.scalar() is None:
-            conn.execute(text("ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 1000"))
-            conn.execute(text("UPDATE users SET balance = 1000 WHERE balance IS NULL"))
+            conn.execute(text("ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0"))
+            conn.execute(text("UPDATE users SET balance = 0 WHERE balance IS NULL"))
             conn.commit()
 
 
