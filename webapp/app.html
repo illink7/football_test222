@@ -662,7 +662,6 @@
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
     } else {
       const balance = me.balance != null ? Number(me.balance) : 0;
-      document.getElementById('balanceValue').textContent = balance;
       const betsBalanceEl = document.getElementById('betsBalanceValue');
       if (betsBalanceEl) {
         betsBalanceEl.textContent = balance;
