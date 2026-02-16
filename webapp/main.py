@@ -981,23 +981,30 @@ async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get
 async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
     """Створити запит на поповнення балансу через TON."""
     if not TON_RECEIVE_WALLET:
-        raise HTTPException(status_code=400, detail="TON wallet not configured")
+        raise HTTPException(
+            status_code=400,
+            detail="TON wallet не налаштовано. Додайте TON_RECEIVE_WALLET у змінні середовища.",
+        )
     user = db.get(User, uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
-    if body.amount <= 0:
+    try:
+        amount_float = float(body.amount)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Невірний формат суми")
+    if amount_float <= 0:
         raise HTTPException(status_code=400, detail="Сума має бути більше 0")
     tx_id = str(uuid.uuid4())
     comment = f"deposit_{uid}_{tx_id[:8]}"
-    amount_nano = int(body.amount * 1_000_000_000)  # 1 поінт = 1 TON (в нанотонах)
+    amount_nano = int(amount_float * 1_000_000_000)  # 1 поінт = 1 TON (в нанотонах)
     payment_link = f"ton://transfer/{TON_RECEIVE_WALLET}?amount={amount_nano}&text={comment}"
     return {
         "ok": True,
         "transaction_id": tx_id,
         "payment_link": payment_link,
-        "amount": body.amount,
+        "amount": amount_float,
         "wallet": TON_RECEIVE_WALLET,
         "comment": comment,
     }

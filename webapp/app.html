@@ -601,12 +601,22 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        if (tg) tg.showAlert(data.detail || 'Помилка');
+        var msg = data.detail || 'Помилка';
+        if (msg.includes('не налаштовано')) {
+          msg = 'TON wallet не налаштовано на сервері. Зверніться до адміністратора.';
+        }
+        if (tg) tg.showAlert(msg);
+        else alert(msg);
         return;
       }
       if (data.payment_link) {
-        window.open(data.payment_link, '_blank');
-        if (tg) tg.showAlert('Перейдіть по посиланню та оплатіть. Після оплати натисніть «Перевірити оплату»');
+        var link = data.payment_link;
+        if (tg && tg.openLink) {
+          tg.openLink(link);
+        } else {
+          window.open(link, '_blank');
+        }
+        if (tg) tg.showAlert('Перейдіть по посиланню та оплатіть. Після оплати система автоматично перевірить транзакцію.');
         setTimeout(function () {
           checkTransactionStatus(data.transaction_id);
         }, 5000);
@@ -614,7 +624,8 @@
         if (tg) tg.showAlert('Помилка генерації посилання');
       }
     } catch (e) {
-      if (tg) tg.showAlert('Помилка мережі');
+      if (tg) tg.showAlert('Помилка мережі: ' + e.message);
+      else alert('Помилка мережі: ' + e.message);
     }
   }
 

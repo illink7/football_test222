@@ -19,8 +19,12 @@ if __name__ == "__main__":
     server = Server(Config(app, host="0.0.0.0", port=port))
 
     async def main():
+        tasks = [server.serve()]
+        # Вимкнути бота якщо RUN_BOT=false (щоб уникнути конфліктів)
+        if os.environ.get("RUN_BOT", "true").lower() != "false":
+            tasks.append(run_bot())
         try:
-            await asyncio.gather(server.serve(), run_bot())
+            await asyncio.gather(*tasks)
         except asyncio.CancelledError:
             pass  # Ctrl+C or shutdown — exit cleanly
 
