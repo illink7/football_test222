@@ -167,13 +167,116 @@
     .tabs-wrap { display: flex; gap: 0; margin: 0 -16px 20px; border-bottom: 2px solid var(--card-border); }
     .tab-btn {
       flex: 1; padding: 14px 16px; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 600;
-      background: transparent; color: var(--tg-theme-text-color); opacity: 0.6; border: none; border-bottom: 3px solid transparent;
-      cursor: pointer; transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+      background: transparent; color: var(--tg-theme-text-color); opacity: 0.5; border: none; border-bottom: 3px solid transparent;
+      cursor: pointer; transition: opacity 0.2s, color 0.2s, border-color 0.2s, background 0.2s;
     }
-    .tab-btn.active { opacity: 1; color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn.active { 
+      opacity: 1; 
+      color: var(--gold); 
+      border-bottom-color: var(--gold);
+      background: rgba(255, 184, 77, 0.1);
+      box-shadow: 0 -2px 8px rgba(255, 184, 77, 0.2);
+    }
     .tab-btn:active { opacity: 0.9; }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    
+    /* Rules Modal */
+    #rulesModal {
+      position: fixed; inset: 0; z-index: 10000;
+      background: rgba(10, 22, 40, 0.95);
+      backdrop-filter: blur(10px);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 1; transition: opacity 0.3s ease;
+    }
+    #rulesModal.hide { opacity: 0; pointer-events: none; }
+    .rules-content {
+      background: var(--card-bg);
+      border: 2px solid var(--gold);
+      border-radius: 20px;
+      padding: 28px 24px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(255, 184, 77, 0.3);
+      text-align: center;
+    }
+    .rules-content h2 {
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.5rem;
+      color: var(--gold);
+      margin: 0 0 20px;
+      text-shadow: 0 2px 8px rgba(255, 184, 77, 0.4);
+    }
+    .rules-list {
+      text-align: left;
+      margin: 20px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+    .rules-list li {
+      padding: 10px 0;
+      padding-left: 32px;
+      position: relative;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: var(--tg-theme-text-color);
+    }
+    .rules-list li::before {
+      content: '⚔️';
+      position: absolute;
+      left: 0;
+      font-size: 1.2rem;
+    }
+    .rules-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: var(--success);
+      color: #0a1628;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(78,205,196,0.4);
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .rules-btn:active { transform: scale(0.98); }
+    
+    /* Balance in bets section */
+    .bets-balance-card {
+      background: linear-gradient(135deg, var(--card-bg) 0%, rgba(21, 38, 64, 0.95) 100%);
+      border: 2px solid var(--gold);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(255, 184, 77, 0.2), 0 0 1px rgba(255, 184, 77, 0.3);
+    }
+    .bets-balance-label {
+      font-size: 0.9rem;
+      color: var(--gold-light);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+    .bets-balance-value {
+      font-family: 'Russo One', sans-serif;
+      font-size: 2.8rem;
+      color: var(--gold);
+      text-shadow: 0 2px 12px rgba(255, 184, 77, 0.4);
+      margin: 8px 0;
+    }
+    .bets-balance-zero {
+      font-size: 0.9rem;
+      color: var(--accent);
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(255, 107, 107, 0.1);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
 
     /* Profile */
     .profile-balance-card {
@@ -223,6 +326,23 @@
     <div class="splash-ball" aria-hidden="true">⚽</div>
       <div class="splash-title font-title">🏴‍☠️ Survivor Football</div>
     <p class="splash-sub">Операция: Футбол</p>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="rulesModal">
+    <div class="rules-content">
+      <h2>🏴‍☠️ Правила игры</h2>
+      <ul class="rules-list">
+        <li>Выберите игру и создайте ставку (билет)</li>
+        <li>Для каждого билета выберите 2 команды, которые забьют</li>
+        <li>Если обе команды забили — ваш билет проходит дальше</li>
+        <li>Ставка увеличивается в 1.5 раза после каждого тура</li>
+        <li>Можно создать несколько билетов на один тур</li>
+        <li>В следующих турах нельзя выбирать уже использованные команды</li>
+        <li>Заберите выигрыш в любой момент или играйте до конца</li>
+      </ul>
+      <button type="button" class="rules-btn" id="rulesCloseBtn">Понятно, начать!</button>
+    </div>
   </div>
 
   <div class="container" id="mainContainer" style="opacity:0; transition: opacity 0.5s ease;">
@@ -311,8 +431,14 @@
       </nav>
       <div id="panelBets" class="tab-panel active">
         <section class="section" id="joinSection">
+          <div class="bets-balance-card" id="betsBalanceCard">
+            <div class="bets-balance-label">Ваш баланс</div>
+            <div class="bets-balance-value" id="betsBalanceValue">—</div>
+            <div id="balanceZeroMessage" class="bets-balance-zero" style="display:none;">
+              💰 Пополните баланс в разделе <strong>Профиль</strong>
+            </div>
+          </div>
           <h2 class="section-title">🎯 Присоединиться к игре</h2>
-          <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поинтов</p>
           <div class="card" id="joinCard">
             <div class="form-row">
               <label class="field-label">Игра</label>
@@ -537,6 +663,14 @@
     } else {
       const balance = me.balance != null ? Number(me.balance) : 0;
       document.getElementById('balanceValue').textContent = balance;
+      const betsBalanceEl = document.getElementById('betsBalanceValue');
+      if (betsBalanceEl) {
+        betsBalanceEl.textContent = balance;
+      }
+      const balanceZeroMsg = document.getElementById('balanceZeroMessage');
+      if (balanceZeroMsg) {
+        balanceZeroMsg.style.display = balance === 0 ? 'block' : 'none';
+      }
       var pv = document.getElementById('profileBalanceValue');
       if (pv) { pv.innerHTML = balance + ' <span>поинтов</span>'; }
       fillStakeSelect(balance);
@@ -967,12 +1101,37 @@
     }
   }
 
+  // Check if rules were shown before
+  function showRulesIfNeeded() {
+    const rulesShown = localStorage.getItem('rulesShown');
+    if (!rulesShown) {
+      const rulesModal = document.getElementById('rulesModal');
+      if (rulesModal) {
+        rulesModal.style.display = 'flex';
+        rulesModal.classList.remove('hide');
+        document.getElementById('rulesCloseBtn').onclick = function() {
+          rulesModal.classList.add('hide');
+          setTimeout(function() {
+            rulesModal.style.display = 'none';
+          }, 300);
+          localStorage.setItem('rulesShown', 'true');
+        };
+      }
+    } else {
+      const rulesModal = document.getElementById('rulesModal');
+      if (rulesModal) rulesModal.style.display = 'none';
+    }
+  }
+
   loadMe();
   setTimeout(function () {
     var splash = document.getElementById('splash');
     var main = document.getElementById('mainContainer');
     if (splash) splash.classList.add('hide');
     if (main) main.style.opacity = '1';
+    setTimeout(function() {
+      showRulesIfNeeded();
+    }, 500);
   }, 2500);
 })();
   </script>
