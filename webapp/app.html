@@ -4,27 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Survivor Football</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --tg-theme-bg-color: #1a1a2e;
-      --tg-theme-text-color: #eee;
-      --tg-theme-button-color: #0f3460;
-      --tg-theme-button-text-color: #eee;
-      --accent: #e94560;
-      --success: #4ecca3;
-      --card-bg: rgba(255,255,255,0.06);
-      --card-border: rgba(255,255,255,0.12);
+      --tg-theme-bg-color: #0d1f0d;
+      --tg-theme-text-color: #e8e0c8;
+      --tg-theme-button-color: #1a3d1a;
+      --tg-theme-button-text-color: #e8e0c8;
+      --pitch: #0d1f0d;
+      --grass: #143814;
+      --gold: #d4a84b;
+      --gold-light: #e8c97a;
+      --accent: #c9302c;
+      --success: #2d8a47;
+      --card-bg: rgba(20, 56, 20, 0.85);
+      --card-border: rgba(212, 168, 75, 0.35);
+      --wood: #2c1810;
     }
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: var(--tg-theme-bg-color);
+      font-family: 'Outfit', -apple-system, sans-serif;
+      background: var(--pitch);
+      background-image: radial-gradient(ellipse at 50% 0%, rgba(45, 138, 71, 0.15) 0%, transparent 50%),
+        linear-gradient(180deg, var(--grass) 0%, var(--pitch) 100%);
       color: var(--tg-theme-text-color);
       margin: 0;
       padding: 0;
       min-height: 100vh;
     }
+    .font-pirate { font-family: 'Pirata One', cursive; }
     .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
     .header {
       text-align: center;
@@ -39,8 +50,8 @@
       margin: 24px 0;
     }
     .section-title {
-      font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
-      opacity: 0.85; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--gold-light); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
     .card {
       background: var(--card-bg);
@@ -48,8 +59,10 @@
       border-radius: 14px;
       padding: 16px;
       margin-bottom: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
     .card:last-child { margin-bottom: 0; }
+    .header { border-bottom-color: var(--card-border); }
     .btn {
       display: inline-flex;
       align-items: center;
@@ -65,9 +78,9 @@
       transition: opacity 0.2s, transform 0.05s;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-secondary { background: var(--tg-theme-button-color); color: var(--tg-theme-button-text-color); }
-    .btn-success { background: var(--success); color: #1a1a2e; }
+    .btn-primary { background: var(--accent); color: #fff; border: 1px solid rgba(201,48,44,0.6); }
+    .btn-secondary { background: var(--wood); color: var(--gold-light); border: 1px solid var(--card-border); }
+    .btn-success { background: var(--success); color: #fff; border: 1px solid rgba(45,138,71,0.6); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     input, textarea, select {
       width: 100%;
@@ -85,7 +98,7 @@
     .form-row:last-child { margin-bottom: 0; }
     .field-label { font-size: 0.85rem; opacity: 0.9; margin-bottom: 6px; display: block; }
     .hint { font-size: 0.8rem; opacity: 0.7; margin-top: 6px; }
-    .balance-line { font-size: 1rem; margin-bottom: 12px; color: var(--success); }
+    .balance-line { font-size: 1rem; margin-bottom: 12px; color: var(--gold); }
     .balance-line strong { font-weight: 700; }
     .error-inline { color: #e94560; opacity: 1; }
     .admin-only { display: none; }
@@ -108,7 +121,7 @@
     .entry-card .meta { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; }
     .entry-card .cta {
       display: inline-flex; align-items: center; gap: 8px;
-      color: var(--success); font-weight: 500; font-size: 0.95rem;
+      color: var(--gold-light); font-weight: 600; font-size: 0.95rem;
     }
     .entry-card.disabled .cta { color: var(--tg-theme-text-color); opacity: 0.7; }
     .game-card-admin { padding: 14px 16px; }
@@ -122,12 +135,78 @@
     .matches-preview .preview-title { font-size: 0.8rem; opacity: 0.8; margin-bottom: 8px; }
     .match-line { font-size: 0.9rem; padding: 4px 0; opacity: 0.95; }
     .expand-toggle { font-size: 0.85rem; color: var(--accent); cursor: pointer; margin-top: 8px; }
+
+    /* Splash: football animation */
+    #splash {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(180deg, #0d1f0d 0%, #143814 50%, #0d1f0d 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.6s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    .splash-ball {
+      width: 80px; height: 80px; font-size: 80px; line-height: 1;
+      animation: bounce 0.8s ease-in-out infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-24px) scale(1.05); }
+    }
+    .splash-title { font-family: 'Pirata One', cursive; font-size: 1.8rem; color: var(--gold); margin-top: 24px; letter-spacing: 0.02em; }
+    .splash-sub { font-size: 0.9rem; color: var(--gold-light); opacity: 0.9; margin-top: 8px; }
+
+    /* Tabs (user) */
+    .tabs-wrap { display: flex; gap: 0; margin: 0 -16px 20px; border-bottom: 2px solid var(--card-border); }
+    .tab-btn {
+      flex: 1; padding: 14px 16px; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 600;
+      background: transparent; color: var(--tg-theme-text-color); opacity: 0.6; border: none; border-bottom: 3px solid transparent;
+      cursor: pointer; transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .tab-btn.active { opacity: 1; color: var(--gold); border-bottom-color: var(--gold); }
+    .tab-btn:active { opacity: 0.9; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Profile */
+    .profile-balance-card {
+      background: linear-gradient(135deg, var(--card-bg) 0%, rgba(44, 24, 16, 0.9) 100%);
+      border: 2px solid var(--gold);
+      border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 20px;
+      box-shadow: 0 0 20px rgba(212, 168, 75, 0.15);
+    }
+    .profile-balance-label { font-size: 0.85rem; color: var(--gold-light); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .profile-balance-value { font-family: 'Pirata One', cursive; font-size: 2.5rem; color: var(--gold); }
+    .profile-balance-value span { font-size: 1rem; opacity: 0.9; margin-left: 4px; }
+    .profile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .profile-actions .btn { font-size: 0.9rem; padding: 12px; }
+    .profile-actions .btn:disabled { opacity: 0.7; cursor: default; }
+    .history-item {
+      padding: 14px 16px; margin-bottom: 10px; border-radius: 12px;
+      background: var(--card-bg); border: 1px solid var(--card-border);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+    }
+    .history-item.win { border-left: 4px solid var(--success); }
+    .history-item.loss { border-left: 4px solid var(--accent); }
+    .history-item.active { border-left: 4px solid var(--gold); }
+    .history-game { font-weight: 600; font-size: 1rem; }
+    .history-meta { font-size: 0.85rem; opacity: 0.85; }
+    .history-result { font-weight: 600; font-size: 0.95rem; }
+    .history-result.win { color: var(--success); }
+    .history-result.loss { color: var(--accent); }
+    .history-result.active { color: var(--gold); }
+    .soon { font-size: 0.75rem; opacity: 0.8; font-weight: normal; }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div id="splash">
+    <div class="splash-ball" aria-hidden="true">⚽</div>
+    <div class="splash-title font-pirate">Survivor Football</div>
+    <p class="splash-sub">Футбол і скарби</p>
+  </div>
+
+  <div class="container" id="mainContainer" style="opacity:0; transition: opacity 0.5s ease;">
     <header class="header">
-      <h1>⚽ Survivor Football</h1>
+      <h1 class="font-pirate" style="color: var(--gold); font-size: 1.75rem;">⚽ Survivor Football</h1>
       <p class="sub">Оберіть матчі та чекайте результатів</p>
     </header>
 
@@ -189,28 +268,51 @@
     </div>
 
     <div id="user" class="user-only">
-      <section class="section" id="joinSection">
-        <h2 class="section-title">🎯 Приєднатися до гри</h2>
-        <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поінтів</p>
-        <div class="card" id="joinCard">
-          <div class="form-row">
-            <label class="field-label">Гра</label>
-            <select id="joinGameId"><option value="">— оберіть гру —</option></select>
+      <nav class="tabs-wrap" aria-label="Розділи">
+        <button type="button" class="tab-btn active" data-tab="bets" id="tabBets">⚽ Ставки</button>
+        <button type="button" class="tab-btn" data-tab="profile" id="tabProfile">🏴‍☠️ Профіль</button>
+      </nav>
+      <div id="panelBets" class="tab-panel active">
+        <section class="section" id="joinSection">
+          <h2 class="section-title">🎯 Приєднатися до гри</h2>
+          <p class="balance-line" id="balanceLine">Ваш баланс: <strong id="balanceValue">—</strong> поінтів</p>
+          <div class="card" id="joinCard">
+            <div class="form-row">
+              <label class="field-label">Гра</label>
+              <select id="joinGameId"><option value="">— оберіть гру —</option></select>
+            </div>
+            <div class="form-row">
+              <label class="field-label">Сума ставки (поінтів)</label>
+              <select id="joinStake">
+                <option value="">— оберіть ставку —</option>
+              </select>
+            </div>
+            <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
           </div>
-          <div class="form-row">
-            <label class="field-label">Сума ставки (поінтів)</label>
-            <select id="joinStake">
-              <option value="">— оберіть ставку —</option>
-            </select>
+        </section>
+        <section class="section">
+          <h2 class="section-title">📋 Мої записи</h2>
+          <div id="entriesList"></div>
+          <p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>
+        </section>
+      </div>
+      <div id="panelProfile" class="tab-panel">
+        <section class="section">
+          <h2 class="section-title">💰 Баланс</h2>
+          <div class="profile-balance-card">
+            <div class="profile-balance-label">Ваш скарб</div>
+            <div class="profile-balance-value" id="profileBalanceValue">— <span>поінтів</span></div>
           </div>
-          <button type="button" id="btnJoin" class="btn btn-primary">Приєднатися</button>
-        </div>
-      </section>
-      <section class="section">
-        <h2 class="section-title">📋 Мої записи</h2>
-        <div id="entriesList"></div>
-        <p class="hint">Оберіть гру вище, суму ставки та натисніть «Приєднатися».</p>
-      </section>
+          <div class="profile-actions">
+            <button type="button" class="btn btn-success" id="btnAddBalance" disabled title="Скоро">Додати баланс <span class="soon">(скоро)</span></button>
+            <button type="button" class="btn btn-secondary" id="btnWithdraw" disabled title="Скоро">Вивести баланс <span class="soon">(скоро)</span></button>
+          </div>
+        </section>
+        <section class="section">
+          <h2 class="section-title">📜 Історія ставок</h2>
+          <div id="profileHistory"></div>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -238,6 +340,40 @@
     loadingEl.style.display = 'none';
   }
 
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    document.getElementById('panelBets').classList.toggle('active', tabName === 'bets');
+    document.getElementById('panelProfile').classList.toggle('active', tabName === 'profile');
+  }
+
+  function renderProfileHistory(entries) {
+    const el = document.getElementById('profileHistory');
+    if (!el) return;
+    if (!entries || !entries.length) {
+      el.innerHTML = '<p class="hint">Історія ставок з\'явиться тут після участі в іграх.</p>';
+      return;
+    }
+    el.innerHTML = entries.map(function (e) {
+      let resultClass = 'active';
+      let resultText = 'В грі';
+      if (e.status === 'cashed_out') {
+        resultClass = 'win';
+        resultText = '+ ' + (e.stake != null ? (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) : '—') + ' поінтів';
+      } else if (e.status === 'out') {
+        resultClass = 'loss';
+        resultText = 'Вибув';
+      }
+      const stakeStr = e.stake != null ? ' Ставка: ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' п.' : '';
+      return '<div class="history-item ' + resultClass + '">' +
+        '<div><div class="history-game">' + escapeHtml(e.game_title) + '</div>' +
+        '<div class="history-meta">Раунд ' + e.current_round + ' / ' + e.rounds_total + stakeStr + '</div></div>' +
+        '<span class="history-result ' + resultClass + '">' + escapeHtml(resultText) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
   function showContent(me) {
     loadingEl.style.display = 'none';
     errorEl.style.display = 'none';
@@ -252,10 +388,15 @@
     } else {
       const balance = me.balance != null ? Number(me.balance) : 1000;
       document.getElementById('balanceValue').textContent = balance;
+      var pv = document.getElementById('profileBalanceValue');
+      if (pv) { pv.innerHTML = balance + ' <span>поінтів</span>'; }
       fillStakeSelect(balance);
       fillJoinGameSelect(me.games || []);
       document.getElementById('btnJoin').onclick = joinGame;
       renderEntriesList(me.entries || [], me.games || []);
+      renderProfileHistory(me.entries || []);
+      document.getElementById('tabBets').onclick = function () { switchTab('bets'); };
+      document.getElementById('tabProfile').onclick = function () { switchTab('profile'); };
     }
   }
 
@@ -501,6 +642,12 @@
   }
 
   loadMe();
+  setTimeout(function () {
+    var splash = document.getElementById('splash');
+    var main = document.getElementById('mainContainer');
+    if (splash) splash.classList.add('hide');
+    if (main) main.style.opacity = '1';
+  }, 2500);
 })();
   </script>
 </body>
