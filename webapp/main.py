@@ -958,7 +958,11 @@ async def connect_wallet(body: ConnectWalletBody, uid: int = Depends(get_current
     """Зберегти адресу TON гаманця користувача."""
     user = db.get(User, uid)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(tg_id=uid, balance=1000)
+        db.add(user)
+        db.flush()
+    if user.balance is None:
+        user.balance = 1000
     if not body.wallet_address or len(body.wallet_address) < 20:
         raise HTTPException(status_code=400, detail="Invalid wallet address")
     user.ton_wallet_address = body.wallet_address
@@ -971,7 +975,11 @@ async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get
     """Відключити TON гаманець."""
     user = db.get(User, uid)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(tg_id=uid, balance=1000)
+        db.add(user)
+        db.flush()
+    if user.balance is None:
+        user.balance = 1000
     user.ton_wallet_address = None
     db.commit()
     return {"ok": True}
@@ -982,7 +990,11 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
     """Створити запит на поповнення балансу через TON."""
     user = db.get(User, uid)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(tg_id=uid, balance=1000)
+        db.add(user)
+        db.flush()
+    if user.balance is None:
+        user.balance = 1000
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     try:
@@ -1034,7 +1046,11 @@ async def withdraw(body: WithdrawBody, uid: int = Depends(get_current_user), db=
     """Запит на виведення балансу на TON гаманець."""
     user = db.get(User, uid)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        user = User(tg_id=uid, balance=1000)
+        db.add(user)
+        db.flush()
+    if user.balance is None:
+        user.balance = 1000
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     if body.amount <= 0:
@@ -1071,8 +1087,14 @@ async def admin_confirm_deposit(
 async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db=Depends(get_db)):
     """Перевірити транзакцію TON через TON Center API."""
     user = db.get(User, uid)
-    if not user or not user.ton_wallet_address:
-        raise HTTPException(status_code=400, detail="User or wallet not found")
+    if not user:
+        user = User(tg_id=uid, balance=1000)
+        db.add(user)
+        db.flush()
+    if user.balance is None:
+        user.balance = 1000
+    if not user.ton_wallet_address:
+        raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     
     # Перевірити чи це тестова транзакція
     test_tx = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
