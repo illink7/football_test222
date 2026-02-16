@@ -6,7 +6,7 @@
   <title>Обрати дві команди — Survivor Football</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Russo+One&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
@@ -42,7 +42,8 @@
       padding: 20px 0 24px;
       border-bottom: 1px solid var(--card-border);
     }
-    .header h1 { font-family: 'Pirata One', cursive; font-size: 1.6rem; margin: 0; color: var(--gold); letter-spacing: 0.02em; }
+    .header h1 { font-family: 'Russo One', sans-serif; font-size: 1.6rem; margin: 0; color: var(--gold); letter-spacing: 0.05em; text-shadow: 0 2px 8px rgba(255, 184, 77, 0.3); }
+    .header h1::before { content: '🏴‍☠️ '; }
     .round-badge {
       display: inline-block;
       font-size: 0.85rem;
@@ -80,25 +81,27 @@
     .team-row.selected {
       background: rgba(78, 205, 196, 0.25);
       border-color: var(--success);
-      box-shadow: 0 0 12px rgba(78, 205, 196, 0.3);
+      box-shadow: 0 0 16px rgba(78, 205, 196, 0.4), 0 2px 8px rgba(0,0,0,0.2);
+      transform: scale(1.02);
     }
     .team-row .check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
     .team-row.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
     .team-row.used { background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.4); cursor: not-allowed; opacity: 0.7; }
     .team-row.used .name { opacity: 0.9; }
-    .team-row .name { flex: 1; font-size: 1rem; }
+    .team-row .name { flex: 1; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .match-row {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 8px;
       padding: 14px 18px;
       margin-bottom: 8px;
       background: var(--card-bg);
       border: 2px solid var(--card-border);
       border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .match-row .vs { opacity: 0.7; font-weight: 600; }
+    .match-row .vs { opacity: 0.9; font-weight: 600; font-size: 1.1rem; flex-shrink: 0; }
     .team-btn {
       display: inline-flex;
       align-items: center;
@@ -106,14 +109,18 @@
       padding: 8px 12px;
       border-radius: 10px;
       cursor: pointer;
-      transition: background 0.2s, border-color 0.2s;
+      transition: background 0.2s, border-color 0.2s, transform 0.1s;
       border: 2px solid transparent;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
     }
+    .team-btn span:not(.check) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .team-btn .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
-    .team-btn.selected { background: rgba(78, 205, 196, 0.25); border-color: var(--success); box-shadow: 0 0 8px rgba(78, 205, 196, 0.3); }
+    .team-btn.selected { background: rgba(78, 205, 196, 0.25); border-color: var(--success); box-shadow: 0 0 12px rgba(78, 205, 196, 0.4), 0 2px 6px rgba(0,0,0,0.15); transform: scale(1.05); }
     .team-btn.selected .check { background: var(--success); border-color: var(--success); color: #fff; }
     .team-btn.used { opacity: 0.7; cursor: not-allowed; }
-    .team-btn:active:not(.used) { opacity: 0.95; }
+    .team-btn:active:not(.used) { opacity: 0.95; transform: scale(0.98); }
     .counter { font-size: 0.85rem; opacity: 0.8; margin-bottom: 12px; text-align: center; }
     .btn {
       display: flex;
@@ -131,7 +138,8 @@
       transition: opacity 0.2s, transform 0.05s;
     }
     .btn:active { transform: scale(0.98); }
-    .btn-success { background: var(--success); color: #0a1628; font-weight: 600; box-shadow: 0 4px 12px rgba(78,205,196,0.3); }
+    .btn-success { background: var(--success); color: #0a1628; font-weight: 600; box-shadow: 0 4px 16px rgba(78,205,196,0.4), 0 0 1px rgba(78,205,196,0.2); }
+    .btn-primary { background: var(--accent); color: #fff; font-weight: 600; box-shadow: 0 4px 16px rgba(255,107,107,0.4), 0 0 1px rgba(255,107,107,0.2); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .success-screen { text-align: center; padding: 32px 20px; }
     .success-screen .icon { font-size: 3rem; margin-bottom: 16px; }
@@ -156,14 +164,16 @@
     .win-screen { text-align: center; padding: 28px 20px; }
     .win-screen .icon { font-size: 3rem; margin-bottom: 12px; }
     .win-screen h2 { font-size: 1.25rem; margin: 0 0 8px; }
-    .win-screen .amount { font-family: 'Pirata One', cursive; font-size: 1.8rem; color: var(--gold); margin: 16px 0; }
+    .win-screen .amount { font-family: 'Russo One', sans-serif; font-size: 1.8rem; color: var(--gold); margin: 16px 0; text-shadow: 0 2px 12px rgba(255, 184, 77, 0.4); }
     .stake-line { font-size: 0.95rem; color: var(--gold); font-weight: 600; margin-top: 8px; }
     .stake-line .muted { font-weight: normal; opacity: 0.85; font-size: 0.85rem; }
     .ticket-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
     .ticket-card {
       display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
       padding: 14px 18px; background: var(--card-bg); border: 2px solid var(--card-border); border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
+    .ticket-card .ticket-teams { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
     .ticket-card.out { opacity: 0.7; border-color: rgba(201,48,44,0.5); }
     .ticket-card .ticket-title { font-weight: 600; color: var(--gold-light); }
     .ticket-card .ticket-teams { font-size: 0.95rem; opacity: 0.95; }
@@ -171,13 +181,13 @@
     .ticket-card .btn-pick:disabled { opacity: 0.6; cursor: not-allowed; }
     .run-round-wrap { margin-top: 20px; }
     .match-score-grid { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 8px; background: var(--card-bg); border-radius: 12px; font-size: 0.95rem; }
-    .match-score-grid .home, .match-score-grid .away { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .match-score-grid .home, .match-score-grid .away { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
     .match-score-grid .home { text-align: right; }
     .match-score-grid .away { text-align: left; }
     .match-score-grid .score { font-weight: 700; min-width: 3.5em; text-align: center; font-variant-numeric: tabular-nums; }
-    .ticket-result { padding: 12px 16px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--card-border); }
-    .ticket-result.passed { background: rgba(78,205,196,0.2); border-color: var(--success); }
-    .ticket-result.failed { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4); }
+    .ticket-result { padding: 12px 16px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .ticket-result.passed { background: rgba(78,205,196,0.2); border-color: var(--success); box-shadow: 0 2px 12px rgba(78,205,196,0.3); }
+    .ticket-result.failed { background: rgba(255,107,107,0.15); border-color: rgba(255,107,107,0.4); box-shadow: 0 2px 12px rgba(255,107,107,0.2); }
     .ticket-result .team-not-scored { color: var(--accent); font-size: 0.9rem; margin-top: 6px; }
     .ticket-result .stake-after { font-size: 0.85rem; opacity: 0.9; }
     .section-label { font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin: 16px 0 8px; }
@@ -186,7 +196,7 @@
 <body>
   <div class="container">
     <header class="header">
-      <h1>⚽ Выбрать команды</h1>
+      <h1>Выбрать команды</h1>
       <div class="round-badge" id="roundInfo">Тур —</div>
       <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> п. <span class="muted">(×1.5 после каждого тура)</span></p>
     </header>
@@ -319,10 +329,10 @@
           var homeUsed = usedSet.has(m.home_id), awayUsed = usedSet.has(m.away_id);
           return '<div class="match-row">' +
             '<span class="team-btn' + (homeUsed ? ' used' : '') + '" data-team-id="' + m.home_id + '" data-used="' + (homeUsed ? '1' : '0') + '" role="button" tabindex="0">' +
-              '<span class="check"></span>' + escapeHtml(m.home_name) + (homeUsed ? ' (исп.)' : '') + '</span>' +
-            ' <span class="vs">—</span> ' +
+              '<span class="check"></span><span>' + escapeHtml(m.home_name) + (homeUsed ? ' (исп.)' : '') + '</span></span>' +
+            ' <span class="vs">⚔️</span> ' +
             '<span class="team-btn' + (awayUsed ? ' used' : '') + '" data-team-id="' + m.away_id + '" data-used="' + (awayUsed ? '1' : '0') + '" role="button" tabindex="0">' +
-              '<span class="check"></span>' + escapeHtml(m.away_name) + (awayUsed ? ' (исп.)' : '') + '</span>' +
+              '<span class="check"></span><span>' + escapeHtml(m.away_name) + (awayUsed ? ' (исп.)' : '') + '</span></span>' +
           '</div>';
         }).join('');
       } else {
@@ -375,13 +385,13 @@
       }
       if (matches.length > 0) {
         html += '<p class="info" style="margin-bottom:8px;">Нажмите «Выбрать команды» для билета, затем выберите две команды из матчей ниже.</p>';
-      html += matches.map(function (m) {
-        return '<div class="match-row">' +
-          '<span class="team-btn" data-team-id="' + m.home_id + '" data-used="0" role="button" tabindex="0"><span class="check"></span>' + escapeHtml(m.home_name) + '</span>' +
-          ' <span class="vs">—</span> ' +
-          '<span class="team-btn" data-team-id="' + m.away_id + '" data-used="0" role="button" tabindex="0"><span class="check"></span>' + escapeHtml(m.away_name) + '</span>' +
-        '</div>';
-      }).join('');
+        html += matches.map(function (m) {
+          return '<div class="match-row">' +
+            '<span class="team-btn" data-team-id="' + m.home_id + '" data-used="0" role="button" tabindex="0"><span class="check"></span><span>' + escapeHtml(m.home_name) + '</span></span>' +
+            ' <span class="vs">⚔️</span> ' +
+            '<span class="team-btn" data-team-id="' + m.away_id + '" data-used="0" role="button" tabindex="0"><span class="check"></span><span>' + escapeHtml(m.away_name) + '</span></span>' +
+          '</div>';
+        }).join('');
     } else {
       html += teamsData.map(function (t) {
         return '<div class="team-row" data-team-id="' + t.id + '" data-used="0" role="button" tabindex="0"><span class="check"></span><span class="name">' + escapeHtml(t.name) + '</span></div>';
@@ -456,7 +466,7 @@
       tickets.forEach(function (t) {
         html += '<div class="ticket-result ' + (t.passed ? 'passed' : 'failed') + '">';
         html += '<strong>Билет ' + t.ticket_index + '</strong>: ' + escapeHtml(t.team1_name) + ', ' + escapeHtml(t.team2_name);
-        html += ' — ' + (t.passed ? '✓ обе забили' : '✗ не забили');
+        html += ' ⚔️ ' + (t.passed ? '✓ обе забили' : '✗ не забили');
         if (!t.passed && t.team_not_scored) {
           html += '<div class="team-not-scored">Не забила: ' + escapeHtml(t.team_not_scored) + '</div>';
         }
