@@ -733,8 +733,8 @@
 
   function fillGamesSelects(games) {
     const opts = games.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + ' · раунд ' + g.current_round + '</option>').join('');
-    document.getElementById('setTeamsGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
-    document.getElementById('addMatchGameId').innerHTML = '<option value="">— оберіть гру —</option>' + opts;
+    document.getElementById('setTeamsGameId').innerHTML = '<option value="">— выберите игру —</option>' + opts;
+    document.getElementById('addMatchGameId').innerHTML = '<option value="">— выберите игру —</option>' + opts;
     if (games.length === 1) {
       document.getElementById('setTeamsGameId').value = games[0].id;
       document.getElementById('addMatchGameId').value = games[0].id;
