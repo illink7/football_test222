@@ -25,3 +25,11 @@ WEBAPP_BASE_URL: str = os.getenv("WEBAPP_BASE_URL", "https://your-domain.com")
 
 # Football-Data.org API (optional; for "Підтягнути тур Бундесліги"). Get key at https://www.football-data.org/
 FOOTBALL_DATA_API_KEY: str | None = os.getenv("FOOTBALL_DATA_API_KEY") or None
+
+# TON Center API (for transaction verification). Get key from @tonapibot (mainnet) or @tontestnetapibot (testnet)
+TON_CENTER_API_KEY: str | None = os.getenv("TON_CENTER_API_KEY") or None
+TON_CENTER_BASE_URL: str = os.getenv("TON_CENTER_BASE_URL", "https://toncenter.com/api/v2/")
+TON_NETWORK: str = os.getenv("TON_NETWORK", "mainnet")  # mainnet or testnet
+
+# TON wallet for receiving payments (admin wallet)
+TON_RECEIVE_WALLET: str | None = os.getenv("TON_RECEIVE_WALLET") or None

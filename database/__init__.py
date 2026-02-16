@@ -78,6 +78,17 @@ def _ensure_users_balance_column():
             conn.commit()
 
 
+def _ensure_users_ton_wallet_column():
+    """Add users.ton_wallet_address for TON Connect integration."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('users') WHERE name='ton_wallet_address'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE users ADD COLUMN ton_wallet_address VARCHAR(64)"))
+            conn.commit()
+
+
 def _ensure_selections_ticket_index():
     """Add selections.ticket_index for підтримка кількох білетів."""
     if "sqlite" not in DATABASE_URL:
@@ -124,6 +135,7 @@ def init_db():
     _ensure_matches_goals_columns()
     _ensure_entries_stake_amount_column()
     _ensure_users_balance_column()
+    _ensure_users_ton_wallet_column()
     _ensure_selections_ticket_index()
     _ensure_tickets_backfill()
 

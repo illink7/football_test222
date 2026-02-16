@@ -5,7 +5,10 @@ Bot is started separately in main.py via asyncio.gather (same process).
 import json
 import random
 import urllib.request
+import uuid
+import base64
 from pathlib import Path
+from datetime import datetime
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -13,9 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY
+from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY, TON_CENTER_API_KEY, TON_CENTER_BASE_URL, TON_NETWORK, TON_RECEIVE_WALLET, WEBAPP_BASE_URL
 from database import get_db
-from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, Ticket, User, UserAchievement
+from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, Ticket, TonTransaction, User, UserAchievement
 from webapp.telegram_auth import get_user_id_from_init_data
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -114,6 +117,18 @@ class JoinGameBody(BaseModel):
     game_id: int
     stake: int | None = None  # сума ставки на один білет (поінтів)
     num_tickets: int | None = None  # кількість білетів (ставок); за замовч. 1
+
+
+class ConnectWalletBody(BaseModel):
+    wallet_address: str
+
+
+class DepositBody(BaseModel):
+    amount: float
+
+
+class WithdrawBody(BaseModel):
+    amount: float
 
 
 # ----- Auth: require valid Telegram initData -----
@@ -218,7 +233,13 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
         }
         for (e, g) in entries
     ]
-    result = {"user_id": uid, "is_admin": is_admin, "balance": user.balance or 1000, "entries": entries_list}
+    result = {
+        "user_id": uid,
+        "is_admin": is_admin,
+        "balance": user.balance or 1000,
+        "ton_wallet_address": user.ton_wallet_address,
+        "entries": entries_list
+    }
     games = db.execute(select(Game).where(Game.status == "active").order_by(Game.id.desc())).scalars().all()
     result["games"] = [
         {"id": g.id, "title": g.title, "current_round": g.current_round, "rounds_total": g.rounds_total, "status": g.status}
@@ -915,6 +936,126 @@ async def api_add_entry(body: EntryAdd, db=Depends(get_db), uid: int = Depends(r
     db.commit()
     db.refresh(entry)
     return {"entry_id": entry.id, "game_id": game.id, "user_id": user_id}
+
+
+# ----- TON Connect & Payments -----
+
+
+@app.get("/tonconnect-manifest.json")
+async def tonconnect_manifest():
+    """TON Connect manifest file."""
+    from fastapi.responses import JSONResponse
+    manifest = {
+        "url": WEBAPP_BASE_URL,
+        "name": "Survivor Football",
+        "iconUrl": WEBAPP_BASE_URL + "/icon.png",
+    }
+    return JSONResponse(content=manifest)
+
+
+@app.post("/api/connect_wallet")
+async def connect_wallet(body: ConnectWalletBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Зберегти адресу TON гаманця користувача."""
+    user = db.get(User, uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not body.wallet_address or len(body.wallet_address) < 20:
+        raise HTTPException(status_code=400, detail="Invalid wallet address")
+    user.ton_wallet_address = body.wallet_address
+    db.commit()
+    return {"ok": True, "wallet_address": body.wallet_address}
+
+
+@app.post("/api/disconnect_wallet")
+async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Відключити TON гаманець."""
+    user = db.get(User, uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.ton_wallet_address = None
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/deposit")
+async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Створити запит на поповнення балансу через TON."""
+    if not TON_RECEIVE_WALLET:
+        raise HTTPException(status_code=400, detail="TON wallet not configured")
+    user = db.get(User, uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.ton_wallet_address:
+        raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сума має бути більше 0")
+    tx_id = str(uuid.uuid4())
+    comment = f"deposit_{uid}_{tx_id[:8]}"
+    amount_nano = int(body.amount * 1_000_000_000)  # 1 поінт = 1 TON (в нанотонах)
+    payment_link = f"ton://transfer/{TON_RECEIVE_WALLET}?amount={amount_nano}&text={comment}"
+    return {
+        "ok": True,
+        "transaction_id": tx_id,
+        "payment_link": payment_link,
+        "amount": body.amount,
+        "wallet": TON_RECEIVE_WALLET,
+        "comment": comment,
+    }
+
+
+@app.post("/api/withdraw")
+async def withdraw(body: WithdrawBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Запит на виведення балансу на TON гаманець."""
+    user = db.get(User, uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.ton_wallet_address:
+        raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="Сума має бути більше 0")
+    if user.balance < int(body.amount):
+        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Ваш баланс: " + str(user.balance))
+    user.balance -= int(body.amount)
+    db.commit()
+    return {"ok": True, "amount": body.amount, "balance": user.balance}
+
+
+@app.get("/api/check_transaction/{tx_id}")
+async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db=Depends(get_db)):
+    """Перевірити транзакцію TON через TON Center API."""
+    if not TON_CENTER_API_KEY or not TON_RECEIVE_WALLET:
+        raise HTTPException(status_code=400, detail="TON Center API not configured")
+    user = db.get(User, uid)
+    if not user or not user.ton_wallet_address:
+        raise HTTPException(status_code=400, detail="User or wallet not found")
+    try:
+        url = f"{TON_CENTER_BASE_URL}getTransactions?address={TON_RECEIVE_WALLET}&limit=30&archival=true&api_key={TON_CENTER_API_KEY}"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        transactions = data.get("result", [])
+        for tx in transactions:
+            in_msg = tx.get("in_msg")
+            if not in_msg:
+                continue
+            tx_hash = tx.get("transaction_id", {}).get("hash", "")
+            if not tx_hash:
+                continue
+            source = in_msg.get("source", "")
+            value = in_msg.get("value", "0")
+            comment = in_msg.get("message", "") or ""
+            if source == user.ton_wallet_address and f"deposit_{uid}_" in comment:
+                existing = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == tx_hash)).scalars().first()
+                if existing:
+                    continue
+                amount_ton = int(value) / 1_000_000_000
+                user.balance = (user.balance or 0) + int(amount_ton)
+                db.add(TonTransaction(tx_hash=tx_hash, user_id=uid, amount=amount_ton, comment=comment))
+                db.commit()
+                return {"confirmed": True, "amount": amount_ton, "balance": user.balance}
+        return {"confirmed": False}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Помилка перевірки транзакції: " + str(e))
 
 
 @app.post("/api/admin/fetch_bundesliga_round")

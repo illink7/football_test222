@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
   <style>
     :root {
       --tg-theme-bg-color: #0d1f0d;
@@ -205,6 +206,9 @@
     }
     .achievement-badge.locked { opacity: 0.5; }
     .achievement-badge .icon { font-size: 1.2rem; }
+    .wallet-addr { font-family: monospace; font-size: 0.85rem; word-break: break-all; color: var(--gold-light); }
+    .wallet-card { margin-top: 16px; }
+    .ton-connect-btn { width: 100%; }
   </style>
 </head>
 <body>
@@ -339,9 +343,19 @@
             <div class="profile-balance-label">Ваш скарб</div>
             <div class="profile-balance-value" id="profileBalanceValue">— <span>поінтів</span></div>
           </div>
+          <div class="card" id="walletCard">
+            <div id="walletNotConnected">
+              <p class="hint">Підключіть TON гаманець для поповнення та виведення балансу</p>
+              <button type="button" class="btn btn-primary" id="btnConnectWallet">🔗 Підключити TON гаманець</button>
+            </div>
+            <div id="walletConnected" style="display:none;">
+              <p class="hint">Гаманець: <span id="walletAddress" class="wallet-addr"></span></p>
+              <button type="button" class="btn btn-secondary" id="btnDisconnectWallet">Відключити</button>
+            </div>
+          </div>
           <div class="profile-actions">
-            <button type="button" class="btn btn-success" id="btnAddBalance" disabled title="Скоро">Додати баланс <span class="soon">(скоро)</span></button>
-            <button type="button" class="btn btn-secondary" id="btnWithdraw" disabled title="Скоро">Вивести баланс <span class="soon">(скоро)</span></button>
+            <button type="button" class="btn btn-success" id="btnAddBalance">💵 Поповнити баланс</button>
+            <button type="button" class="btn btn-secondary" id="btnWithdraw">💸 Вивести баланс</button>
           </div>
         </section>
         <section class="section">
@@ -425,6 +439,74 @@
     }).join('');
   }
 
+  let tonConnectUI = null;
+  let userWalletAddress = null;
+
+  function initTonConnect() {
+    if (typeof TON_CONNECT_UI === 'undefined') {
+      console.warn('TON Connect UI not loaded, retrying...');
+      setTimeout(initTonConnect, 1000);
+      return;
+    }
+    try {
+      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        manifestUrl: baseUrl + '/tonconnect-manifest.json',
+      });
+      tonConnectUI.onStatusChange(function (wallet) {
+        if (wallet && wallet.account) {
+          userWalletAddress = wallet.account.address;
+          handleWalletConnected(wallet.account.address);
+        } else {
+          userWalletAddress = null;
+          handleWalletDisconnected();
+        }
+      });
+      tonConnectUI.restoreConnection();
+    } catch (e) {
+      console.error('TON Connect init error:', e);
+    }
+  }
+
+  function handleWalletConnected(address) {
+    document.getElementById('walletNotConnected').style.display = 'none';
+    document.getElementById('walletConnected').style.display = 'block';
+    document.getElementById('walletAddress').textContent = address.substring(0, 6) + '...' + address.substring(address.length - 6);
+    connectWalletToBackend(address);
+  }
+
+  function handleWalletDisconnected() {
+    document.getElementById('walletNotConnected').style.display = 'block';
+    document.getElementById('walletConnected').style.display = 'none';
+    disconnectWalletFromBackend();
+  }
+
+  async function connectWalletToBackend(address) {
+    try {
+      var r = await fetch(baseUrl + '/api/connect_wallet', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ wallet_address: address })
+      });
+      var data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (tg) tg.showAlert(data.detail || 'Помилка підключення гаманця');
+      }
+    } catch (e) {
+      console.error('Connect wallet error:', e);
+    }
+  }
+
+  async function disconnectWalletFromBackend() {
+    try {
+      await fetch(baseUrl + '/api/disconnect_wallet', {
+        method: 'POST',
+        headers: authHeaders()
+      });
+    } catch (e) {
+      console.error('Disconnect wallet error:', e);
+    }
+  }
+
   function showContent(me) {
     loadingEl.style.display = 'none';
     errorEl.style.display = 'none';
@@ -458,6 +540,117 @@
       renderAchievements(me.achievements || []);
       document.getElementById('tabBets').onclick = function () { switchTab('bets'); };
       document.getElementById('tabProfile').onclick = function () { switchTab('profile'); };
+      initTonConnect();
+      if (me.ton_wallet_address) {
+        userWalletAddress = me.ton_wallet_address;
+        handleWalletConnected(me.ton_wallet_address);
+      }
+      document.getElementById('btnConnectWallet').onclick = function () {
+        if (tonConnectUI) {
+          tonConnectUI.openModal();
+        } else {
+          if (tg) tg.showAlert('TON Connect не завантажено. Перезавантажте сторінку.');
+        }
+      };
+      document.getElementById('btnDisconnectWallet').onclick = function () {
+        if (tonConnectUI) {
+          tonConnectUI.disconnect();
+        }
+      };
+      document.getElementById('btnAddBalance').onclick = function () {
+        if (!userWalletAddress) {
+          if (tg) tg.showAlert('Спочатку підключіть TON гаманець');
+          return;
+        }
+        showDepositDialog();
+      };
+      document.getElementById('btnWithdraw').onclick = function () {
+        if (!userWalletAddress) {
+          if (tg) tg.showAlert('Спочатку підключіть TON гаманець');
+          return;
+        }
+        showWithdrawDialog();
+      };
+    }
+  }
+
+  function showDepositDialog() {
+    var amount = prompt('Введіть суму поповнення (поінтів):');
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      if (tg) tg.showAlert('Введіть коректну суму');
+      return;
+    }
+    requestDeposit(parseFloat(amount));
+  }
+
+  function showWithdrawDialog() {
+    var amount = prompt('Введіть суму виведення (поінтів):');
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+      if (tg) tg.showAlert('Введіть коректну суму');
+      return;
+    }
+    requestWithdraw(parseFloat(amount));
+  }
+
+  async function requestDeposit(amount) {
+    try {
+      var r = await fetch(baseUrl + '/api/deposit', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ amount: amount })
+      });
+      var data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (tg) tg.showAlert(data.detail || 'Помилка');
+        return;
+      }
+      if (data.payment_link) {
+        window.open(data.payment_link, '_blank');
+        if (tg) tg.showAlert('Перейдіть по посиланню та оплатіть. Після оплати натисніть «Перевірити оплату»');
+        setTimeout(function () {
+          checkTransactionStatus(data.transaction_id);
+        }, 5000);
+      } else {
+        if (tg) tg.showAlert('Помилка генерації посилання');
+      }
+    } catch (e) {
+      if (tg) tg.showAlert('Помилка мережі');
+    }
+  }
+
+  async function requestWithdraw(amount) {
+    try {
+      var r = await fetch(baseUrl + '/api/withdraw', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ amount: amount })
+      });
+      var data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (tg) tg.showAlert(data.detail || 'Помилка');
+        return;
+      }
+      if (tg) tg.showAlert('Запит на виведення створено. Переказимо після підтвердження.');
+      loadMe();
+    } catch (e) {
+      if (tg) tg.showAlert('Помилка мережі');
+    }
+  }
+
+  async function checkTransactionStatus(txId) {
+    try {
+      var r = await fetch(baseUrl + '/api/check_transaction/' + txId, {
+        headers: authHeaders()
+      });
+      var data = await r.json().catch(function () { return {}; });
+      if (data.confirmed) {
+        if (tg) tg.showAlert('Оплата підтверджена! Баланс поповнено.');
+        loadMe();
+      } else {
+        setTimeout(function () { checkTransactionStatus(txId); }, 5000);
+      }
+    } catch (e) {
+      console.error('Check transaction error:', e);
     }
   }
 

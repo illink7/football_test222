@@ -15,6 +15,7 @@ class User(Base):
     username = Column(String(255), nullable=True)
     is_admin = Column(Boolean, default=False)
     balance = Column(Integer, default=1000)  # поінты (грн), 1000 при першому заході
+    ton_wallet_address = Column(String(64), nullable=True)  # TON wallet address (bounceable format)
 
     entries = relationship("Entry", back_populates="user", lazy="selectin")
     achievements = relationship("UserAchievement", back_populates="user", lazy="selectin")
@@ -30,6 +31,18 @@ class UserAchievement(Base):
     unlocked_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="achievements")
+
+
+class TonTransaction(Base):
+    """Перевірені TON транзакції (щоб не підтверджувати двічі)."""
+    __tablename__ = "ton_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tx_hash = Column(String(64), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.tg_id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    comment = Column(String(128), nullable=True)
+    confirmed_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Game(Base):
