@@ -752,7 +752,7 @@
       }
       if (data.test_mode) {
         if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' поинтов');
-        loadMe();
+        await loadMe();
       } else if (data.payment_link) {
         var link = data.payment_link;
         if (tg && tg.openLink) {
@@ -786,7 +786,7 @@
         return;
       }
       if (tg) tg.showAlert('Запрос на вывод создан. Переведем после подтверждения.');
-      loadMe();
+      await loadMe();
     } catch (e) {
       if (tg) tg.showAlert('Ошибка сети');
     }
@@ -800,7 +800,7 @@
       var data = await r.json().catch(function () { return {}; });
       if (data.confirmed) {
         if (tg) tg.showAlert('Оплата подтверждена! Баланс пополнен.');
-        loadMe();
+        await loadMe();
       } else {
         setTimeout(function () { checkTransactionStatus(txId); }, 5000);
       }
@@ -1096,6 +1096,18 @@
         return;
       }
       showContent(data);
+      // Update balance in bets section if user is not admin
+      if (!data.is_admin) {
+        const balance = data.balance != null ? Number(data.balance) : 0;
+        const betsBalanceEl = document.getElementById('betsBalanceValue');
+        if (betsBalanceEl) {
+          betsBalanceEl.textContent = balance;
+        }
+        const balanceZeroMsg = document.getElementById('balanceZeroMessage');
+        if (balanceZeroMsg) {
+          balanceZeroMsg.style.display = balance === 0 ? 'block' : 'none';
+        }
+      }
     } catch (e) {
       showError('Ошибка сети: ' + e.message);
     }
