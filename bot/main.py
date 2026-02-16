@@ -8,6 +8,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramConflictError
 
 from config import BOT_TOKEN
 from bot.handlers import admin, user
@@ -31,10 +32,13 @@ async def run_bot():
     dp.include_router(user.router)
     try:
         await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
+    except TelegramConflictError as e:
+        logger.warning(f"Bot conflict detected - another instance is running. Skipping bot. Error: {e}")
+        return
     except Exception as e:
         logger.error(f"Bot polling error: {e}")
-        # Якщо конфлікт - просто виходимо, не падаємо
-        if "Conflict" in str(e):
+        # Якщо конфлікт в тексті помилки - також виходимо
+        if "Conflict" in str(e) or "TelegramConflictError" in str(type(e).__name__):
             logger.warning("Bot conflict detected - another instance is running. Skipping bot.")
             return
         raise
