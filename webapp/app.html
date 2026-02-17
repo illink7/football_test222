@@ -275,6 +275,13 @@
     .deposit-choice-btns { display: flex; flex-direction: column; gap: 12px; }
     .deposit-choice-btn { width: 100%; padding: 16px; font-size: 1rem; font-weight: 600; min-height: 48px; touch-action: manipulation; }
     .deposit-choice-cancel { margin-top: 12px; width: 100%; }
+    .deposit-by-address { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--card-border); text-align: left; }
+    .deposit-by-address-title { font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin-bottom: 10px; }
+    .deposit-by-address-row { margin-bottom: 10px; }
+    .deposit-by-address-row label { display: block; font-size: 0.8rem; opacity: 0.9; margin-bottom: 4px; }
+    .deposit-addr, .deposit-memo { display: block; font-size: 0.75rem; word-break: break-all; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 6px; }
+    .deposit-by-address-row .btn-small { padding: 6px 12px; font-size: 0.85rem; width: auto; margin-top: 4px; }
+    .deposit-by-address-note { font-size: 0.8rem; opacity: 0.85; margin: 10px 0 0; }
     
     /* Balance in bets section */
     .bets-balance-card {
@@ -377,16 +384,30 @@
     </div>
   </div>
 
-  <!-- Модалка выбора способа пополнения (Tonkeeper / Telegram Wallet) -->
+  <!-- Модалка выбора способа пополнения -->
   <div id="depositChoiceModal" class="deposit-choice-overlay" style="display: none;">
     <div class="deposit-choice-card">
       <h3 class="deposit-choice-title">Способ пополнения</h3>
-      <p class="deposit-choice-hint">Оберіть гаманець для оплати USDT</p>
+      <p class="deposit-choice-hint">Оберіть гаманець або перекажіть по адресі</p>
       <div class="deposit-choice-btns">
         <button type="button" class="btn deposit-choice-btn" id="depositBtnTonkeeper">Tonkeeper</button>
         <button type="button" class="btn deposit-choice-btn" id="depositBtnTelegram">Telegram Wallet</button>
       </div>
-      <button type="button" class="btn btn-secondary deposit-choice-cancel" id="depositChoiceCancel">Отмена</button>
+      <div class="deposit-by-address">
+        <div class="deposit-by-address-title">По адресу (будь-який гаманець)</div>
+        <div class="deposit-by-address-row">
+          <label>Адреса:</label>
+          <code id="depositModalAddress" class="deposit-addr"></code>
+          <button type="button" class="btn btn-small" id="depositCopyAddress">Копіювати</button>
+        </div>
+        <div class="deposit-by-address-row">
+          <label>Memo (коментар):</label>
+          <code id="depositModalMemo" class="deposit-memo"></code>
+          <button type="button" class="btn btn-small" id="depositCopyMemo">Копіювати</button>
+        </div>
+        <p class="deposit-by-address-note">Перекажіть USDT на адресу з цим memo — баланс підтвердиться автоматично.</p>
+      </div>
+      <button type="button" class="btn btn-secondary deposit-choice-cancel" id="depositChoiceCancel">Закрити</button>
     </div>
   </div>
 
@@ -806,15 +827,29 @@
     if (tg && tg.openLink) tg.openLink(link);
     else window.open(link, '_blank');
   }
+  function copyToClipboard(text, msg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        if (tg) tg.showAlert(msg || 'Скопійовано');
+        else alert(msg || 'Скопійовано');
+      }).catch(function () {
+        if (tg) tg.showAlert('Скопіюйте вручну: ' + text.slice(0, 30) + '…');
+        else alert('Скопіюйте вручну: ' + text);
+      });
+    } else {
+      if (tg) tg.showAlert('Скопіюйте вручну з блоку «По адресу» нижче');
+      else alert('Скопіюйте вручну: ' + text);
+    }
+  }
   (function initDepositChoiceModal() {
     var modal = document.getElementById('depositChoiceModal');
     var btnTk = document.getElementById('depositBtnTonkeeper');
     var btnTg = document.getElementById('depositBtnTelegram');
     var btnCancel = document.getElementById('depositChoiceCancel');
+    var btnCopyAddr = document.getElementById('depositCopyAddress');
+    var btnCopyMemo = document.getElementById('depositCopyMemo');
     if (!modal || !btnTk || !btnTg) return;
-    function closeDepositModal() {
-      modal.style.display = 'none';
-    }
+    function closeDepositModal() { modal.style.display = 'none'; }
     btnTk.addEventListener('click', function () {
       var d = window._depositLinks;
       if (d && d.tk) openDepositLink(d.tk);
@@ -822,8 +857,21 @@
     });
     btnTg.addEventListener('click', function () {
       var d = window._depositLinks;
-      if (d && d.tg) openDepositLink(d.tg);
-      closeDepositModal();
+      if (!d) return;
+      if (d.wallet) {
+        copyToClipboard(d.wallet, 'Адресу скопійовано. Відкрийте Wallet в Telegram → Переказ → вставте адресу. Memo скопіюйте кнопкою нижче.');
+      }
+      if (d.tg) {
+        try { openDepositLink(d.tg); } catch (e) {}
+      }
+    });
+    if (btnCopyAddr) btnCopyAddr.addEventListener('click', function () {
+      var d = window._depositLinks;
+      if (d && d.wallet) copyToClipboard(d.wallet, 'Адресу скопійовано');
+    });
+    if (btnCopyMemo) btnCopyMemo.addEventListener('click', function () {
+      var d = window._depositLinks;
+      if (d && d.comment) copyToClipboard(d.comment, 'Memo скопійовано');
     });
     if (btnCancel) btnCancel.addEventListener('click', closeDepositModal);
   })();
@@ -852,15 +900,17 @@
         var linkTk = data.payment_link;
         var linkTg = data.payment_link_telegram || linkTk;
         var txId = data.transaction_id;
-        window._depositLinks = { tk: linkTk, tg: linkTg, txId: txId };
+        var wallet = data.wallet || '';
+        var comment = data.comment || '';
+        window._depositLinks = { tk: linkTk, tg: linkTg, txId: txId, wallet: wallet, comment: comment };
         var modal = document.getElementById('depositChoiceModal');
-        if (modal) {
-          modal.style.display = 'flex';
-        }
+        var addrEl = document.getElementById('depositModalAddress');
+        var memoEl = document.getElementById('depositModalMemo');
+        if (addrEl) addrEl.textContent = wallet;
+        if (memoEl) memoEl.textContent = comment;
+        if (modal) modal.style.display = 'flex';
         if (tg) tg.showAlert('Оберіть спосіб поповнення. Після оплати баланс підтвердиться автоматично.');
-        setTimeout(function () {
-          checkTransactionStatus(txId);
-        }, 5000);
+        setTimeout(function () { checkTransactionStatus(txId); }, 5000);
       } else {
         if (tg) tg.showAlert('Ошибка генерации ссылки');
       }
