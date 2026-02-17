@@ -243,6 +243,8 @@
       transition: transform 0.1s, box-shadow 0.2s;
     }
     .rules-btn:active { transform: scale(0.98); }
+    .rules-btn:hover { box-shadow: 0 6px 20px rgba(78,205,196,0.5); }
+    #rulesCloseBtn { touch-action: manipulation; cursor: pointer; min-height: 48px; }
     
     /* Balance in bets section */
     .bets-balance-card {
@@ -328,8 +330,8 @@
     <p class="splash-sub">Операция: Футбол</p>
   </div>
 
-  <!-- Rules Modal -->
-  <div id="rulesModal">
+  <!-- Rules Modal (скрыт по умолчанию, показывается в showRulesIfNeeded) -->
+  <div id="rulesModal" style="display: none;">
     <div class="rules-content">
       <h2>🏴‍☠️ Правила игры</h2>
       <ul class="rules-list">
@@ -778,11 +780,26 @@
         if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' USDT');
         await loadMe();
       } else if (data.payment_link) {
-        var link = data.payment_link;
-        if (tg && tg.openLink) {
-          tg.openLink(link);
+        var linkTk = data.payment_link;
+        var linkTg = data.payment_link_telegram || linkTk;
+        function openDepositLink(link) {
+          if (tg && tg.openLink) tg.openLink(link);
+          else window.open(link, '_blank');
+        }
+        if (data.payment_link_telegram && tg && tg.showPopup) {
+          tg.showPopup({
+            title: 'Способ пополнения',
+            message: 'Оберіть гаманець для оплати USDT. Потім підтвердіть переказ у вибраному гаманці.',
+            buttons: [
+              { id: 'tonkeeper', type: 'default', text: 'Tonkeeper' },
+              { id: 'telegram', type: 'default', text: 'Telegram Wallet' }
+            ]
+          }).then(function (btnId) {
+            if (btnId === 'tonkeeper') openDepositLink(linkTk);
+            else if (btnId === 'telegram') openDepositLink(linkTg);
+          }).catch(function () {});
         } else {
-          window.open(link, '_blank');
+          openDepositLink(linkTk);
         }
         if (tg) tg.showAlert('Перейдите по ссылке и оплатите. После оплаты система автоматически проверит транзакцию.');
         setTimeout(function () {
@@ -1184,25 +1201,30 @@
     }
   }
 
+  // Кнопка «Понятно» — привязываем один раз при загрузке
+  (function initRulesCloseBtn() {
+    var rulesModal = document.getElementById('rulesModal');
+    var rulesCloseBtn = document.getElementById('rulesCloseBtn');
+    if (!rulesModal || !rulesCloseBtn) return;
+    rulesCloseBtn.addEventListener('click', function() {
+      rulesModal.classList.add('hide');
+      setTimeout(function() {
+        rulesModal.style.display = 'none';
+      }, 300);
+      localStorage.setItem('rulesShown', 'true');
+    });
+  })();
+
   // Check if rules were shown before
   function showRulesIfNeeded() {
-    const rulesShown = localStorage.getItem('rulesShown');
+    var rulesModal = document.getElementById('rulesModal');
+    if (!rulesModal) return;
+    var rulesShown = localStorage.getItem('rulesShown');
     if (!rulesShown) {
-      const rulesModal = document.getElementById('rulesModal');
-      if (rulesModal) {
-        rulesModal.style.display = 'flex';
-        rulesModal.classList.remove('hide');
-        document.getElementById('rulesCloseBtn').onclick = function() {
-          rulesModal.classList.add('hide');
-          setTimeout(function() {
-            rulesModal.style.display = 'none';
-          }, 300);
-          localStorage.setItem('rulesShown', 'true');
-        };
-      }
+      rulesModal.classList.remove('hide');
+      rulesModal.style.display = 'flex';
     } else {
-      const rulesModal = document.getElementById('rulesModal');
-      if (rulesModal) rulesModal.style.display = 'none';
+      rulesModal.style.display = 'none';
     }
   }
 

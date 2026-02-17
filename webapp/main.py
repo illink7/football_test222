@@ -1050,12 +1050,16 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
             status_code=400,
             detail="TON_RECEIVE_WALLET не налаштовано.",
         )
-    # Посилання відкриває переказ на наш адрес з коментарем (користувач у гаманці обирає USDT)
-    payment_link = f"https://app.tonkeeper.com/transfer/{TON_RECEIVE_WALLET}?text={comment}"
+    comment_enc = urllib.parse.quote(comment)
+    # Tonkeeper: відкриває переказ, користувач обирає USDT
+    payment_link = f"https://app.tonkeeper.com/transfer/{TON_RECEIVE_WALLET}?text={comment_enc}&jetton={USDT_JETTON_MASTER}"
+    # Універсальний ton:// — відкривається в Telegram Wallet та інших TON-гаманцях
+    payment_link_telegram = f"ton://transfer/{TON_RECEIVE_WALLET}?text={comment_enc}&jetton={USDT_JETTON_MASTER}"
     return {
         "ok": True,
         "transaction_id": tx_id,
         "payment_link": payment_link,
+        "payment_link_telegram": payment_link_telegram,
         "amount": amount_float,
         "wallet": TON_RECEIVE_WALLET,
         "comment": comment,
