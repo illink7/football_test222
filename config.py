@@ -42,5 +42,6 @@ USDT_JETTON_MASTER: str = os.getenv(
 # TON Center API v3 (for jetton transfers)
 TON_CENTER_V3_URL: str = os.getenv("TON_CENTER_V3_URL", "https://toncenter.com/api/v3/")
 
-# Test mode: if True, deposits are auto-confirmed without checking blockchain (for testing)
+# Test mode: False = реальные USDT (проверка через TON Center v3). True = тест (начисление без перевода).
+# Для реальных депозитов: TON_TEST_MODE=false и задайте TON_RECEIVE_WALLET.
 TON_TEST_MODE: bool = os.getenv("TON_TEST_MODE", "false").lower() == "true"
