@@ -485,14 +485,34 @@
       }
       waitEl.textContent = 'Загрузка результатов…';
       fetch(baseUrl + '/api/entry/' + entryId + '/run_round', { method: 'POST' })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (errData) {
+              throw new Error(errData.detail || 'Ошибка получения результатов');
+            });
+          }
+          return r.json();
+        })
         .then(function (data) {
           showResultsScreen(data);
         })
-        .catch(function () {
-          if (tg) tg.showAlert('Не удалось получить результаты');
-          else alert('Не удалось получить результаты');
-          if (waitEl) waitEl.textContent = 'Ошибка. Обновите страницу.';
+        .catch(function (e) {
+          const errorMsg = e.message || 'Не удалось получить результаты';
+          if (tg) tg.showAlert(errorMsg);
+          else alert(errorMsg);
+          contentEl.innerHTML =
+            '<div class="results-screen">' +
+              '<div class="icon">⏳</div>' +
+              '<h2>Результаты пока недоступны</h2>' +
+              '<p class="message">' + escapeHtml(errorMsg) + '</p>' +
+              '<button type="button" class="btn btn-success btn-next" id="btnBackToSelection">Вернуться к выбору</button>' +
+            '</div>';
+          const backBtn = document.getElementById('btnBackToSelection');
+          if (backBtn) {
+            backBtn.addEventListener('click', function () {
+              window.location.reload();
+            });
+          }
         });
     }
     tick();

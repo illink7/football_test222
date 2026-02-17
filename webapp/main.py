@@ -743,7 +743,7 @@ def _apply_round_results(db, game, rnd: int) -> None:
 
 @app.post("/api/entry/{entry_id}/run_round")
 async def run_round(entry_id: int, db=Depends(get_db)):
-    """Симуляція туру: рахуємо білети всіх записів, повертаємо результат для цього entry."""
+    """Отримати результати туру з API та застосувати їх. Для Бундесліги синхронізує з Football-Data.org."""
     entry = db.get(Entry, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -774,12 +774,95 @@ async def run_round(entry_id: int, db=Depends(get_db)):
     )
     if not matches:
         raise HTTPException(status_code=400, detail="Немає матчів у цьому турі")
+    
+    # Для Бундесліги синхронізуємо результати з API
+    if game.title == "Bundesliga" and game.start_matchday and FOOTBALL_DATA_API_KEY:
+        matchday = game.start_matchday + rnd - 1
+        try:
+            matches_data = _fetch_bl1_matches_for_matchday(matchday)
+            ext_id_to_match = {m.external_id: m for m in matches if m.external_id}
+            all_finished = True
+            has_scheduled = False
+            latest_match_time = None
+            
+            for m_data in matches_data:
+                ext_id = str(m_data.get("id")) if m_data.get("id") is not None else None
+                our_match = ext_id_to_match.get(ext_id) if ext_id else None
+                if not our_match:
+                    continue
+                
+                score = (m_data.get("score") or {}).get("fullTime") or {}
+                hg, ag = score.get("home"), score.get("away")
+                status_val = m_data.get("status")
+                utc_date = _parse_utc_date(m_data.get("utcDate"))
+                
+                if status_val == "FINISHED" and hg is not None and ag is not None:
+                    our_match.home_goals = int(hg)
+                    our_match.away_goals = int(ag)
+                    our_match.status = status_val
+                elif status_val in ("SCHEDULED", "TIMED", "POSTPONED"):
+                    all_finished = False
+                    has_scheduled = True
+                    if utc_date and (latest_match_time is None or utc_date > latest_match_time):
+                        latest_match_time = utc_date
+                elif status_val in ("LIVE", "IN_PLAY", "PAUSED"):
+                    all_finished = False
+                    # Оновлюємо поточний рахунок навіть якщо матч ще не завершений
+                    if hg is not None and ag is not None:
+                        our_match.home_goals = int(hg)
+                        our_match.away_goals = int(ag)
+                    our_match.status = status_val
+            
+            db.commit()
+            
+            # Якщо не всі матчі завершені, повертаємо інформацію про статус
+            if not all_finished:
+                if has_scheduled:
+                    if latest_match_time:
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
+                        if latest_match_time.tzinfo is None:
+                            latest_match_time = latest_match_time.replace(tzinfo=timezone.utc)
+                        if latest_match_time > now:
+                            time_str = latest_match_time.strftime("%d.%m.%Y %H:%M UTC")
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Матчі туру ще не завершені. Останній матч відбудеться {time_str}. Результати будуть доступні після завершення всіх матчів туру."
+                            )
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Матчі туру ще не завершені. Результати будуть доступні після завершення всіх матчів туру."
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Деякі матчі туру ще тривають. Результати будуть доступні після завершення всіх матчів туру."
+                    )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Не вдалося отримати результати з API: {e}")
+    
+    # Перевіряємо чи всі матчі мають результати
     round_just_simulated = False
-    if matches[0].home_goals is None:
-        round_just_simulated = True
-        for m in matches:
-            m.home_goals = random.randint(MIN_GOALS, MAX_GOALS)
-            m.away_goals = random.randint(MIN_GOALS, MAX_GOALS)
+    all_have_results = all(m.home_goals is not None and m.away_goals is not None for m in matches)
+    
+    if not all_have_results:
+        # Якщо це не Бундесліга або API не налаштовано, генеруємо рандомні результати (для тестування)
+        if game.title != "Bundesliga" or not FOOTBALL_DATA_API_KEY:
+            round_just_simulated = True
+            for m in matches:
+                m.home_goals = random.randint(MIN_GOALS, MAX_GOALS)
+                m.away_goals = random.randint(MIN_GOALS, MAX_GOALS)
+        else:
+            # Для Бундесліги якщо немає результатів - помилка
+            raise HTTPException(
+                status_code=400,
+                detail="Результати матчів ще не доступні. Спробуйте пізніше."
+            )
+    
+    # Застосовуємо результати тільки якщо вони є
+    if all_have_results or round_just_simulated:
         _apply_round_results(db, game, rnd)
         db.refresh(game)
         for m in matches:
