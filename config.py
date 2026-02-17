@@ -34,5 +34,13 @@ TON_NETWORK: str = os.getenv("TON_NETWORK", "mainnet")  # mainnet or testnet
 # TON wallet for receiving payments (admin wallet)
 TON_RECEIVE_WALLET: str | None = os.getenv("TON_RECEIVE_WALLET") or None
 
+# USDT on TON: jetton master contract (mainnet)
+USDT_JETTON_MASTER: str = os.getenv(
+    "USDT_JETTON_MASTER",
+    "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",  # Tether USDT on TON mainnet
+)
+# TON Center API v3 (for jetton transfers)
+TON_CENTER_V3_URL: str = os.getenv("TON_CENTER_V3_URL", "https://toncenter.com/api/v3/")
+
 # Test mode: if True, deposits are auto-confirmed without checking blockchain (for testing)
 TON_TEST_MODE: bool = os.getenv("TON_TEST_MODE", "false").lower() == "true"

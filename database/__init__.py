@@ -89,6 +89,18 @@ def _ensure_users_ton_wallet_column():
             conn.commit()
 
 
+def _ensure_users_balance_usdt_column():
+    """Add users.balance_usdt (REAL) for USDT balance."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('users') WHERE name='balance_usdt'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE users ADD COLUMN balance_usdt REAL DEFAULT 0"))
+            conn.execute(text("UPDATE users SET balance_usdt = 0 WHERE balance_usdt IS NULL"))
+            conn.commit()
+
+
 def _ensure_selections_ticket_index():
     """Add selections.ticket_index for підтримка кількох білетів."""
     if "sqlite" not in DATABASE_URL:
@@ -136,6 +148,7 @@ def init_db():
     _ensure_entries_stake_amount_column()
     _ensure_users_balance_column()
     _ensure_users_ton_wallet_column()
+    _ensure_users_balance_usdt_column()
     _ensure_selections_ticket_index()
     _ensure_tickets_backfill()
 

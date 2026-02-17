@@ -333,7 +333,8 @@
     <div class="rules-content">
       <h2>🏴‍☠️ Правила игры</h2>
       <ul class="rules-list">
-        <li>Выберите игру и создайте ставку (билет)</li>
+        <li>Пополните баланс в USDT в разделе Профиль</li>
+        <li>Выберите игру и создайте ставку (0.1–5 USDT на билет)</li>
         <li>Для каждого билета выберите 2 команды, которые забьют</li>
         <li>Если обе команды забили — ваш билет проходит дальше</li>
         <li>Ставка увеличивается в 1.5 раза после каждого тура</li>
@@ -422,6 +423,28 @@
           <div id="matchesAddedPreview" class="matches-preview" style="display:none;"></div>
         </div>
       </section>
+
+      <section class="section">
+        <h2 class="section-title">💰 Ручное подтверждение депозита USDT</h2>
+        <div class="card">
+          <p class="hint">Если игрок отправил USDT, но баланс не обновился автоматически — введите данные и подтвердите зачисление.</p>
+          <div class="form-row">
+            <label class="field-label">Transaction ID (из запроса пополнения)</label>
+            <input type="text" id="adminConfirmTxId" placeholder="например: a1b2c3d4-..." />
+          </div>
+          <div class="form-row">
+            <label class="field-label">Telegram ID пользователя</label>
+            <input type="number" id="adminConfirmUserId" placeholder="8386941234" />
+          </div>
+          <div class="form-row">
+            <label class="field-label">Сумма (USDT)</label>
+            <input type="number" id="adminConfirmAmount" placeholder="1.5" step="0.01" min="0.1" />
+          </div>
+          <p id="adminConfirmError" class="hint error-inline" style="display:none;"></p>
+          <p id="adminConfirmSuccess" class="hint" style="display:none; color: var(--success);"></p>
+          <button type="button" id="btnAdminConfirmDeposit" class="btn btn-success">Подтвердить зачисление USDT</button>
+        </div>
+      </section>
     </div>
 
     <div id="user" class="user-only">
@@ -435,7 +458,7 @@
             <div class="bets-balance-label">Ваш баланс</div>
             <div class="bets-balance-value" id="betsBalanceValue">—</div>
             <div id="balanceZeroMessage" class="bets-balance-zero" style="display:none;">
-              💰 Пополните баланс в разделе <strong>Профиль</strong>
+              💰 Пополните баланс (USDT) в разделе <strong>Профиль</strong>
             </div>
           </div>
           <h2 class="section-title">🎯 Присоединиться к игре</h2>
@@ -445,7 +468,7 @@
               <select id="joinGameId"><option value="">— выберите игру —</option></select>
             </div>
             <div class="form-row">
-              <label class="field-label">Сумма на один билет (поинтов)</label>
+              <label class="field-label">Сумма на один билет (USDT)</label>
               <select id="joinStake">
                 <option value="">— выберите ставку —</option>
               </select>
@@ -474,7 +497,7 @@
           <h2 class="section-title">💰 Баланс</h2>
           <div class="profile-balance-card">
             <div class="profile-balance-label">Ваш баланс</div>
-            <div class="profile-balance-value" id="profileBalanceValue">— <span>поинтов</span></div>
+            <div class="profile-balance-value" id="profileBalanceValue">— <span>USDT</span></div>
           </div>
           <div class="card" id="walletCard">
             <div id="walletNotConnected">
@@ -558,12 +581,12 @@
       let resultText = 'В игре';
       if (e.status === 'cashed_out') {
         resultClass = 'win';
-        resultText = '+ ' + (e.stake != null ? (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) : '—') + ' поинтов';
+        resultText = '+ ' + (e.stake != null ? (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(2)) : '—') + ' USDT';
       } else if (e.status === 'out') {
         resultClass = 'loss';
         resultText = 'Выбыл';
       }
-      const stakeStr = e.stake != null ? ' Ставка: ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' п.' : '';
+      const stakeStr = e.stake != null ? ' Ставка: ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(2)) + ' USDT' : '';
       return '<div class="history-item ' + resultClass + '">' +
         '<div><div class="history-game">' + escapeHtml(e.game_title) + '</div>' +
         '<div class="history-meta">Раунд ' + e.current_round + ' / ' + e.rounds_total + stakeStr + '</div></div>' +
@@ -660,18 +683,20 @@
         if (tg) tg.showAlert('Вставлено 20 команд Ла Лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
+      var btnAdminConfirm = document.getElementById('btnAdminConfirmDeposit');
+      if (btnAdminConfirm) btnAdminConfirm.onclick = adminConfirmDeposit;
     } else {
       const balance = me.balance != null ? Number(me.balance) : 0;
       const betsBalanceEl = document.getElementById('betsBalanceValue');
       if (betsBalanceEl) {
-        betsBalanceEl.textContent = balance;
+        betsBalanceEl.textContent = balance % 1 === 0 ? balance : Number(balance).toFixed(2);
       }
       const balanceZeroMsg = document.getElementById('balanceZeroMessage');
       if (balanceZeroMsg) {
         balanceZeroMsg.style.display = balance === 0 ? 'block' : 'none';
       }
       var pv = document.getElementById('profileBalanceValue');
-      if (pv) { pv.innerHTML = balance + ' <span>поинтов</span>'; }
+      if (pv) { pv.innerHTML = (balance % 1 === 0 ? balance : Number(balance).toFixed(2)) + ' <span>USDT</span>'; }
       fillStakeSelect(balance);
       fillJoinGameSelect(me.games || []);
       document.getElementById('btnJoin').onclick = joinGame;
@@ -715,7 +740,7 @@
   }
 
   function showDepositDialog() {
-    var amount = prompt('Введите сумму пополнения (поинтов):');
+    var amount = prompt('Введите сумму пополнения (USDT):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       if (tg) tg.showAlert('Введите корректную сумму');
       return;
@@ -724,7 +749,7 @@
   }
 
   function showWithdrawDialog() {
-    var amount = prompt('Введите сумму вывода (поинтов):');
+    var amount = prompt('Введите сумму вывода (USDT):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       if (tg) tg.showAlert('Введите корректную сумму');
       return;
@@ -750,7 +775,7 @@
         return;
       }
       if (data.test_mode) {
-        if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' поинтов');
+        if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' USDT');
         await loadMe();
       } else if (data.payment_link) {
         var link = data.payment_link;
@@ -811,8 +836,8 @@
   var ACHIEVEMENT_LABELS = {
     first_bet: 'Первая ставка',
     first_loss: 'Первая проигранная ставка',
-    cashed_out_100: 'Забрал 100+ поинтов',
-    cashed_out_500: 'Забрал 500+ поинтов',
+    cashed_out_100: 'Забрал 100+ USDT',
+    cashed_out_500: 'Забрал 500+ USDT',
     survived_5_rounds: 'Прошел 5 туров'
   };
 
@@ -835,18 +860,19 @@
     }).join('');
   }
 
-  const STAKE_OPTIONS = [10, 20, 50, 100, 200];
+  const STAKE_OPTIONS = [0.1, 0.2, 0.5, 1, 2, 5];
 
   function fillStakeSelect(balance) {
     const sel = document.getElementById('joinStake');
     if (!sel) return;
+    const bal = Number(balance);
     let opts = '<option value="">— выберите ставку —</option>';
     STAKE_OPTIONS.forEach(function (v) {
-      if (v <= balance) opts += '<option value="' + v + '">' + v + ' поинтов</option>';
+      if (v <= bal) opts += '<option value="' + v + '">' + v + ' USDT</option>';
     });
     sel.innerHTML = opts;
-    if (balance < 10) {
-      opts += '<option value="" disabled>Недостаточно поинтов (мин. 10)</option>';
+    if (bal < 0.1) {
+      opts += '<option value="" disabled>Недостаточно USDT (мин. 0.1)</option>';
       sel.innerHTML = opts;
     }
   }
@@ -884,7 +910,7 @@
     el.innerHTML = games.map(g =>
       '<div class="card game-card-admin">' +
         '<div class="name">' + escapeHtml(g.title) + '</div>' +
-        '<div class="meta">Раунд ' + g.current_round + ' з ' + g.rounds_total + ' · ' + g.status + '</div>' +
+        '<div class="meta">Раунд ' + g.current_round + ' из ' + g.rounds_total + ' · ' + g.status + '</div>' +
       '</div>'
     ).join('');
     fillGamesSelects(games);
@@ -906,7 +932,7 @@
       else if (e.status === 'cashed_out') ctaText = 'Выигрыш забран';
       else if (e.status === 'out') ctaText = 'Вы выбыли';
       const ctaIcon = canPick ? '⚽' : (e.status === 'cashed_out' ? '🏆' : '⏳');
-      const stakeStr = e.stake != null ? ' · ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(1)) + ' п.' : '';
+      const stakeStr = e.stake != null ? ' · ' + (Number(e.stake) % 1 === 0 ? e.stake : Number(e.stake).toFixed(2)) + ' USDT' : '';
       return '<a href="' + link + '" class="' + cardClass + '">' +
         '<div class="game-name">' + escapeHtml(e.game_title) + '</div>' +
         '<div class="meta">Раунд ' + e.current_round + ' из ' + e.rounds_total + stakeStr + '</div>' +
@@ -919,14 +945,14 @@
     const gameId = document.getElementById('joinGameId').value;
     const stakeEl = document.getElementById('joinStake');
     const numTicketsEl = document.getElementById('joinNumTickets');
-    const stakeVal = stakeEl && stakeEl.value ? parseInt(stakeEl.value, 10) : null;
+    const stakeVal = stakeEl && stakeEl.value ? parseFloat(stakeEl.value) : null;
     const numTickets = numTicketsEl && numTicketsEl.value ? parseInt(numTicketsEl.value, 10) : 1;
     if (!gameId) {
       if (tg) tg.showAlert('Выберите игру');
       return;
     }
-    if (!stakeVal || stakeVal < 10) {
-      if (tg) tg.showAlert('Выберите сумму ставки (мин. 10 поинтов)');
+    if (!stakeVal || stakeVal < 0.1) {
+      if (tg) tg.showAlert('Выберите сумму ставки (мин. 0.1 USDT)');
       return;
     }
     try {
@@ -1021,6 +1047,52 @@
     }
   }
 
+  async function adminConfirmDeposit() {
+    const errEl = document.getElementById('adminConfirmError');
+    const okEl = document.getElementById('adminConfirmSuccess');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (okEl) { okEl.style.display = 'none'; okEl.textContent = ''; }
+    const txId = (document.getElementById('adminConfirmTxId') || {}).value.trim();
+    const userIdEl = document.getElementById('adminConfirmUserId');
+    const amountEl = document.getElementById('adminConfirmAmount');
+    const userId = userIdEl ? parseInt(userIdEl.value, 10) : NaN;
+    const amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    if (!txId) {
+      if (errEl) { errEl.textContent = 'Введите Transaction ID'; errEl.style.display = 'block'; }
+      if (tg) tg.showAlert('Введите Transaction ID');
+      return;
+    }
+    if (!userId || isNaN(userId)) {
+      if (errEl) { errEl.textContent = 'Введите Telegram ID пользователя'; errEl.style.display = 'block'; }
+      if (tg) tg.showAlert('Введите Telegram ID пользователя');
+      return;
+    }
+    if (!amount || isNaN(amount) || amount < 0.1) {
+      if (errEl) { errEl.textContent = 'Введите сумму не менее 0.1 USDT'; errEl.style.display = 'block'; }
+      if (tg) tg.showAlert('Введите сумму не менее 0.1 USDT');
+      return;
+    }
+    try {
+      const r = await fetch(baseUrl + '/api/admin/confirm_deposit?tx_id=' + encodeURIComponent(txId) + '&user_id=' + userId + '&amount=' + amount, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (errEl) { errEl.textContent = data.detail || 'Ошибка'; errEl.style.display = 'block'; }
+        if (tg) tg.showAlert(data.detail || 'Ошибка');
+        return;
+      }
+      if (okEl) { okEl.textContent = 'Зачислено ' + amount + ' USDT. Баланс пользователя: ' + (data.balance != null ? data.balance : '—'); okEl.style.display = 'block'; }
+      if (tg) tg.showAlert('Депозит подтверждён: +' + amount + ' USDT');
+      document.getElementById('adminConfirmTxId').value = '';
+      if (amountEl) amountEl.value = '';
+    } catch (e) {
+      if (errEl) { errEl.textContent = e.message || 'Ошибка сети'; errEl.style.display = 'block'; }
+      if (tg) tg.showAlert(e.message || 'Ошибка сети');
+    }
+  }
+
   async function addMatches() {
     const errEl = document.getElementById('addMatchError');
     errEl.style.display = 'none';
@@ -1053,14 +1125,14 @@
       const added = data.added || 0;
       const notFound = data.not_found || [];
       if (notFound.length > 0) {
-        errEl.textContent = 'Не знайдено в базі (перевірте написання): ' + notFound.slice(0, 8).join(', ') + (notFound.length > 8 ? '…' : '');
+        errEl.textContent = 'Не найдено в базе (проверьте написание): ' + notFound.slice(0, 8).join(', ') + (notFound.length > 8 ? '…' : '');
         errEl.style.display = 'block';
       }
       if (added > 0) {
-        if (tg) tg.showAlert('Додано матчів: ' + added + (notFound.length ? '. Частина не додалась — дивіться підказку під кнопкою.' : ''));
+        if (tg) tg.showAlert('Добавлено матчей: ' + added + (notFound.length ? '. Часть не добавилась — смотрите подсказку под кнопкой.' : ''));
         document.getElementById('addMatchText').value = '';
       } else if (notFound.length === 0) {
-        if (tg) tg.showAlert('Нічого не додано. Перевірте формат: Дім — Гость на кожен рядок.');
+        if (tg) tg.showAlert('Ничего не добавлено. Проверьте формат: Дома — Гость на каждую строку.');
       }
       loadMe();
       if (added > 0) {
@@ -1073,7 +1145,7 @@
             listData.map(m => '<div class="match-line"><span class="team-name">' + escapeHtml(m.home) + '</span> ⚔️ <span class="team-name">' + escapeHtml(m.away) + '</span></div>').join('');
         } else {
           preview.style.display = 'block';
-          preview.innerHTML = '<div class="preview-title">Додано ' + added + ' матчів. Вони з’являться у виборі гравців.</div>';
+          preview.innerHTML = '<div class="preview-title">Добавлено ' + added + ' матчей. Они появятся в выборе игроков.</div>';
         }
       }
     } catch (e) {
@@ -1100,7 +1172,7 @@
         const balance = data.balance != null ? Number(data.balance) : 0;
         const betsBalanceEl = document.getElementById('betsBalanceValue');
         if (betsBalanceEl) {
-          betsBalanceEl.textContent = balance;
+          betsBalanceEl.textContent = balance % 1 === 0 ? balance : balance.toFixed(2);
         }
         const balanceZeroMsg = document.getElementById('balanceZeroMessage');
         if (balanceZeroMsg) {

@@ -14,7 +14,8 @@ class User(Base):
     tg_id = Column(Integer, primary_key=True)
     username = Column(String(255), nullable=True)
     is_admin = Column(Boolean, default=False)
-    balance = Column(Integer, default=0)  # поінты (грн), 0 при першому заході (потрібно поповнити)
+    balance = Column(Integer, default=0)  # legacy (points)
+    balance_usdt = Column(Float, default=0.0)  # баланс в USDT (основна валюта)
     ton_wallet_address = Column(String(64), nullable=True)  # TON wallet address (bounceable format)
 
     entries = relationship("Entry", back_populates="user", lazy="selectin")

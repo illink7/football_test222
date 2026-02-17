@@ -198,7 +198,7 @@
     <header class="header">
       <h1>Выбрать команды</h1>
       <div class="round-badge" id="roundInfo">Тур —</div>
-      <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> п. <span class="muted">(×1.5 после каждого тура)</span></p>
+      <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> USDT <span class="muted">(×1.5 после каждого тура)</span></p>
     </header>
 
     <p class="intro" id="intro">Выберите для каждого билета по две команды, которые забьют. В следующих турах для этого билета нельзя выбирать уже использованные команды.</p>
@@ -296,7 +296,7 @@
     if (!data) return;
     roundData = data;
     var rawTickets = data.tickets || [];
-    var tickets = rawTickets.length > 0 ? rawTickets : [{ ticket_index: 1, status: 'active', stake_amount: data.stake || 10, used_team_ids: data.used_team_ids || [], selection: null }];
+    var tickets = rawTickets.length > 0 ? rawTickets : [{ ticket_index: 1, status: 'active', stake_amount: data.stake != null ? data.stake : 0.1, used_team_ids: data.used_team_ids || [], selection: null }];
     const matches = data.matches || [];
     teamsData = data.teams || [];
     roundEl.textContent = 'Тур ' + data.round;
@@ -370,7 +370,7 @@
           var out = t.status !== 'active';
           var sel = t.selection;
           html += '<div class="ticket-card' + (out ? ' out' : '') + '">';
-          html += '<div><span class="ticket-title">🎫 Билет ' + t.ticket_index + '</span> · ' + formatStake(t.stake_amount) + ' п.</div>';
+          html += '<div><span class="ticket-title">🎫 Билет ' + t.ticket_index + '</span> · ' + formatStake(t.stake_amount) + ' USDT</div>';
           if (out) {
             html += '<span class="ticket-teams">Выбыл</span>';
           } else if (sel) {
@@ -459,7 +459,7 @@
     html += '<h2>' + (passed ? 'Проходите дальше!' : 'Результаты тура') + '</h2>';
     html += '<p class="message ' + (passed ? 'passed' : 'out') + '">' + escapeHtml(data.message || '') + '</p>';
     if (data.stake_after_round != null) {
-      html += '<p class="stake-line">Сумма активных билетов: <strong>' + formatStake(data.stake_after_round) + '</strong> поинтов</p>';
+      html += '<p class="stake-line">Сумма активных билетов: <strong>' + formatStake(data.stake_after_round) + '</strong> USDT</p>';
     }
     if (tickets.length > 0) {
       html += '<p class="section-label">Ваши билеты</p>';
@@ -470,7 +470,7 @@
         if (!t.passed && t.team_not_scored) {
           html += '<div class="team-not-scored">Не забила: ' + escapeHtml(t.team_not_scored) + '</div>';
         }
-        html += ' <span class="stake-after">' + formatStake(t.stake_after) + ' п.</span>';
+        html += ' <span class="stake-after">' + formatStake(t.stake_after) + ' USDT</span>';
         html += '</div>';
       });
     }
@@ -508,12 +508,12 @@
           .then(function (r) { return r.json(); })
           .then(function (res) {
             const amount = res.amount != null ? formatStake(res.amount) : '0';
-            const balanceStr = res.balance != null ? '<p class="stake-line">Ваш баланс тепер: <strong>' + res.balance + '</strong> поінтів</p>' : '';
+            const balanceStr = res.balance != null ? '<p class="stake-line">Ваш баланс: <strong>' + (res.balance % 1 === 0 ? res.balance : Number(res.balance).toFixed(2)) + '</strong> USDT</p>' : '';
             contentEl.innerHTML =
               '<div class="results-screen win-screen">' +
                 '<div class="icon">🏆</div>' +
                 '<h2>Вы выиграли!</h2>' +
-                '<p class="amount">' + amount + ' поинтов</p>' +
+                '<p class="amount">' + amount + ' USDT</p>' +
                 balanceStr +
                 '<p class="message passed">Вы забрали выигрыш. Спасибо за игру!</p>' +
                 '<button type="button" class="btn btn-success btn-next" id="btnMainMenuWin">В главное меню</button>' +

@@ -5,6 +5,7 @@ Bot is started separately in main.py via asyncio.gather (same process).
 import json
 import random
 import urllib.request
+import urllib.parse
 import uuid
 import base64
 from pathlib import Path
@@ -16,7 +17,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from config import BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY, TON_CENTER_API_KEY, TON_CENTER_BASE_URL, TON_NETWORK, TON_RECEIVE_WALLET, TON_TEST_MODE, WEBAPP_BASE_URL
+from config import (
+    BOT_TOKEN, ADMIN_ID, FOOTBALL_DATA_API_KEY,
+    TON_CENTER_API_KEY, TON_CENTER_BASE_URL, TON_NETWORK,
+    TON_RECEIVE_WALLET, TON_TEST_MODE, WEBAPP_BASE_URL,
+    USDT_JETTON_MASTER, TON_CENTER_V3_URL,
+)
 from database import get_db
 from database.models import Entry, Game, Match, EntryMatchSelection, Selection, Team, Ticket, TonTransaction, User, UserAchievement
 from webapp.telegram_auth import get_user_id_from_init_data
@@ -115,7 +121,7 @@ class EntryAdd(BaseModel):
 
 class JoinGameBody(BaseModel):
     game_id: int
-    stake: int | None = None  # сума ставки на один білет (поінтів)
+    stake: float | None = None  # сума ставки на один білет (USDT)
     num_tickets: int | None = None  # кількість білетів (ставок); за замовч. 1
 
 
@@ -171,6 +177,19 @@ def _grant_achievement(db, user_id: int, key: str) -> bool:
     return True
 
 
+def _balance(user) -> float:
+    """Баланс користувача в USDT."""
+    if user is None:
+        return 0.0
+    v = getattr(user, "balance_usdt", None)
+    return float(v) if v is not None else 0.0
+
+
+def _set_balance(user, value: float):
+    """Встановити баланс в USDT."""
+    user.balance_usdt = round(value, 6)
+
+
 # ----- Endpoints -----
 
 
@@ -200,15 +219,15 @@ async def select_teams_page():
 
 @app.get("/api/me")
 async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Повертає user_id, is_admin, balance (поінты), entries. При першому заході юзер отримує 0 поінтів (потрібно поповнити)."""
+    """Повертає user_id, is_admin, balance (USDT), entries."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)  # новий юзер — 0 поінтів, потрібно поповнити
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.commit()
         db.refresh(user)
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
         db.commit()
         db.refresh(user)
     is_admin = uid == ADMIN_ID
@@ -236,7 +255,7 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
     result = {
         "user_id": uid,
         "is_admin": is_admin,
-        "balance": user.balance or 0,
+        "balance": _balance(user),
         "ton_wallet_address": user.ton_wallet_address,
         "entries": entries_list
     }
@@ -255,7 +274,7 @@ async def api_me(uid: int = Depends(get_current_user), db=Depends(get_db)):
 
 @app.post("/api/join_game")
 async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Будь-який гравець може приєднатися до гри (створити собі запис). Опційно вказати суму ставки."""
+    """Приєднатися до гри. Ставка в USDT (0.1, 0.2, 0.5, 1, 2, 5)."""
     game = db.get(Game, body.game_id)
     if not game:
         raise HTTPException(status_code=404, detail="Гру не знайдено")
@@ -263,38 +282,38 @@ async def join_game(body: JoinGameBody, uid: int = Depends(get_current_user), db
         raise HTTPException(status_code=400, detail="Гра не активна")
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
-    # Перевірка балансу перед початком гри
-    if (user.balance or 0) <= 0:
-        raise HTTPException(status_code=400, detail="Поповніть баланс перед початком гри")
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
+    bal = _balance(user)
+    if bal <= 0:
+        raise HTTPException(status_code=400, detail="Поповніть баланс (USDT) у розділі Профіль")
     existing = db.execute(
         select(Entry).where(Entry.user_id == uid, Entry.game_id == body.game_id)
     ).scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="Ви вже приєднані до цієї гри")
     num_tickets = max(1, min(10, int(body.num_tickets or 1)))
-    initial_stake = float(body.stake) if body.stake is not None else 10.0
-    stake_int = int(round(initial_stake))
-    if stake_int < 1:
-        raise HTTPException(status_code=400, detail="Мінімальна ставка — 1 поінт")
-    total_cost = stake_int * num_tickets
-    if user.balance < total_cost:
-        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Потрібно: " + str(total_cost) + ", ваш баланс: " + str(user.balance))
-    user.balance -= total_cost
-    entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=float(stake_int))
+    initial_stake = float(body.stake) if body.stake is not None else 0.1
+    if initial_stake < 0.1:
+        raise HTTPException(status_code=400, detail="Мінімальна ставка — 0.1 USDT")
+    stake_float = round(initial_stake, 2)
+    total_cost = round(stake_float * num_tickets, 2)
+    if bal < total_cost:
+        raise HTTPException(status_code=400, detail=f"Недостатньо USDT. Потрібно: {total_cost}, ваш баланс: {bal}")
+    _set_balance(user, bal - total_cost)
+    entry = Entry(user_id=uid, game_id=body.game_id, status="active", stake=body.stake, stake_amount=stake_float)
     db.add(entry)
     db.flush()
     for i in range(1, num_tickets + 1):
-        db.add(Ticket(entry_id=entry.id, ticket_index=i, stake_amount=float(stake_int), status="active"))
+        db.add(Ticket(entry_id=entry.id, ticket_index=i, stake_amount=stake_float, status="active"))
     _grant_achievement(db, uid, "first_bet")
     db.commit()
     db.refresh(entry)
     db.refresh(user)
-    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": stake_int, "num_tickets": num_tickets, "balance": user.balance}
+    return {"ok": True, "entry_id": entry.id, "game_id": game.id, "stake": stake_float, "num_tickets": num_tickets, "balance": _balance(user)}
 
 
 @app.get("/api/teams/available")
@@ -772,7 +791,7 @@ async def cash_out(entry_id: int, db=Depends(get_db)):
         amount_float = float(entry.stake_amount or entry.stake or 0)
     user = db.get(User, entry.user_id)
     if user:
-        user.balance = (user.balance or 0) + int(round(amount_float))
+        _set_balance(user, _balance(user) + amount_float)
     entry.status = "cashed_out"
     if user:
         if amount_float >= 500:
@@ -780,7 +799,7 @@ async def cash_out(entry_id: int, db=Depends(get_db)):
         if amount_float >= 100:
             _grant_achievement(db, user.tg_id, "cashed_out_100")
     db.commit()
-    new_balance = user.balance if user else None
+    new_balance = _balance(user) if user else None
     return {"ok": True, "amount": amount_float, "balance": new_balance}
 
 
@@ -961,11 +980,11 @@ async def connect_wallet(body: ConnectWalletBody, uid: int = Depends(get_current
     """Зберегти адресу TON гаманця користувача."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
     if not body.wallet_address or len(body.wallet_address) < 20:
         raise HTTPException(status_code=400, detail="Invalid wallet address")
     user.ton_wallet_address = body.wallet_address
@@ -978,11 +997,11 @@ async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get
     """Відключити TON гаманець."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
     user.ton_wallet_address = None
     db.commit()
     return {"ok": True}
@@ -990,28 +1009,28 @@ async def disconnect_wallet(uid: int = Depends(get_current_user), db=Depends(get
 
 @app.post("/api/deposit")
 async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Створити запит на поповнення балансу через TON."""
+    """Поповнення балансу в USDT (мережа TON)."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     try:
-        amount_float = float(body.amount)
+        amount_float = round(float(body.amount), 2)
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Невірний формат суми")
-    if amount_float <= 0:
-        raise HTTPException(status_code=400, detail="Сума має бути більше 0")
+    if amount_float < 0.1:
+        raise HTTPException(status_code=400, detail="Мінімум 0.1 USDT")
     tx_id = str(uuid.uuid4())
     comment = f"deposit_{uid}_{tx_id[:8]}"
     
-    # Тестовий режим: автоматично підтверджуємо без перевірки блокчейну
+    # Тестовий режим
     if TON_TEST_MODE:
-        user.balance = (user.balance or 0) + int(amount_float)
+        _set_balance(user, _balance(user) + amount_float)
         db.add(TonTransaction(tx_hash=f"test_{tx_id}", user_id=uid, amount=amount_float, comment=comment))
         db.commit()
         return {
@@ -1022,17 +1041,17 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
             "wallet": None,
             "comment": comment,
             "test_mode": True,
-            "balance": user.balance,
+            "balance": _balance(user),
         }
     
-    # Продакшн режим: генеруємо посилання для оплати
+    # Реальний режим: поповнення в USDT на TON
     if not TON_RECEIVE_WALLET:
         raise HTTPException(
             status_code=400,
-            detail="TON wallet не налаштовано. Додайте TON_RECEIVE_WALLET у змінні середовища.",
+            detail="TON_RECEIVE_WALLET не налаштовано.",
         )
-    amount_nano = int(amount_float * 1_000_000_000)  # 1 поінт = 1 TON (в нанотонах)
-    payment_link = f"ton://transfer/{TON_RECEIVE_WALLET}?amount={amount_nano}&text={comment}"
+    # Посилання відкриває переказ на наш адрес з коментарем (користувач у гаманці обирає USDT)
+    payment_link = f"https://app.tonkeeper.com/transfer/{TON_RECEIVE_WALLET}?text={comment}"
     return {
         "ok": True,
         "transaction_id": tx_id,
@@ -1046,23 +1065,25 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
 
 @app.post("/api/withdraw")
 async def withdraw(body: WithdrawBody, uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Запит на виведення балансу на TON гаманець."""
+    """Запит на виведення USDT на TON гаманець (обробляється вручну або автоматично)."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
-    if body.amount <= 0:
-        raise HTTPException(status_code=400, detail="Сума має бути більше 0")
-    if user.balance < int(body.amount):
-        raise HTTPException(status_code=400, detail="Недостатньо поінтів. Ваш баланс: " + str(user.balance))
-    user.balance -= int(body.amount)
+    amount = round(float(body.amount), 2)
+    if amount < 0.1:
+        raise HTTPException(status_code=400, detail="Мінімум 0.1 USDT")
+    bal = _balance(user)
+    if bal < amount:
+        raise HTTPException(status_code=400, detail=f"Недостатньо USDT. Баланс: {bal}")
+    _set_balance(user, bal - amount)
     db.commit()
-    return {"ok": True, "amount": body.amount, "balance": user.balance}
+    return {"ok": True, "amount": amount, "balance": _balance(user)}
 
 
 @app.post("/api/admin/confirm_deposit")
@@ -1073,65 +1094,82 @@ async def admin_confirm_deposit(
     db=Depends(get_db),
     _admin: int = Depends(require_admin),
 ):
-    """Адмін: ручно підтвердити депозит (для тестування)."""
+    """Адмін: ручно підтвердити депозит USDT."""
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     existing = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
     if existing:
         raise HTTPException(status_code=400, detail="Транзакція вже підтверджена")
-    user.balance = (user.balance or 0) + int(amount)
+    _set_balance(user, _balance(user) + amount)
     db.add(TonTransaction(tx_hash=f"test_{tx_id}", user_id=user_id, amount=amount, comment=f"admin_confirm_{tx_id}"))
     db.commit()
-    return {"ok": True, "amount": amount, "balance": user.balance}
+    return {"ok": True, "amount": amount, "balance": _balance(user)}
+
+
+def _decode_jetton_comment(forward_payload_b64: str) -> str:
+    """Декодувати текст коментаря з forward_payload (base64)."""
+    if not forward_payload_b64:
+        return ""
+    try:
+        raw = base64.b64decode(forward_payload_b64)
+        # перші 4 байти — op (0x00000000 для text), далі utf-8 текст
+        if len(raw) > 4:
+            return raw[4:].decode("utf-8", errors="ignore").strip()
+        return raw.decode("utf-8", errors="ignore").strip()
+    except Exception:
+        return ""
 
 
 @app.get("/api/check_transaction/{tx_id}")
 async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db=Depends(get_db)):
-    """Перевірити транзакцію TON через TON Center API."""
+    """Перевірити вхідний USDT (jetton) переказ через TON Center API v3."""
     user = db.get(User, uid)
     if not user:
-        user = User(tg_id=uid, balance=0)
+        user = User(tg_id=uid, balance=0, balance_usdt=0.0)
         db.add(user)
         db.flush()
-    if user.balance is None:
-        user.balance = 0
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
     if not user.ton_wallet_address:
         raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     
-    # Перевірити чи це тестова транзакція
     test_tx = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
     if test_tx:
-        return {"confirmed": True, "amount": test_tx.amount, "balance": user.balance}
+        return {"confirmed": True, "amount": test_tx.amount, "balance": _balance(user)}
     
-    # Реальна перевірка через TON Center API
-    if not TON_CENTER_API_KEY or not TON_RECEIVE_WALLET:
-        return {"confirmed": False, "message": "TON Center API not configured"}
+    if not TON_RECEIVE_WALLET:
+        return {"confirmed": False, "message": "TON_RECEIVE_WALLET not configured"}
     try:
-        url = f"{TON_CENTER_BASE_URL}getTransactions?address={TON_RECEIVE_WALLET}&limit=30&archival=true&api_key={TON_CENTER_API_KEY}"
+        # TON Center API v3: вхідні USDT-трансфери на наш гаманець
+        url = (
+            f"{TON_CENTER_V3_URL}jetton/transfers?"
+            f"owner_address={urllib.parse.quote(TON_RECEIVE_WALLET)}&direction=in&jetton_master={urllib.parse.quote(USDT_JETTON_MASTER)}&limit=50"
+        )
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
-        transactions = data.get("result", [])
-        for tx in transactions:
-            in_msg = tx.get("in_msg")
-            if not in_msg:
+        transfers = data.get("jetton_transfers") or []
+        prefix = f"deposit_{uid}_{tx_id[:8]}"
+        for t in transfers:
+            comment = _decode_jetton_comment(t.get("forward_payload") or "")
+            if prefix not in comment:
                 continue
-            tx_hash = tx.get("transaction_id", {}).get("hash", "")
+            tx_hash = t.get("transaction_hash") or ""
             if not tx_hash:
                 continue
-            source = in_msg.get("source", "")
-            value = in_msg.get("value", "0")
-            comment = in_msg.get("message", "") or ""
-            if source == user.ton_wallet_address and f"deposit_{uid}_" in comment:
-                existing = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == tx_hash)).scalars().first()
-                if existing:
-                    continue
-                amount_ton = int(value) / 1_000_000_000
-                user.balance = (user.balance or 0) + int(amount_ton)
-                db.add(TonTransaction(tx_hash=tx_hash, user_id=uid, amount=amount_ton, comment=comment))
-                db.commit()
-                return {"confirmed": True, "amount": amount_ton, "balance": user.balance}
+            existing = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == tx_hash)).scalars().first()
+            if existing:
+                continue
+            # USDT на TON: 6 decimals
+            amount_raw = int(t.get("amount") or "0")
+            amount_usdt = round(amount_raw / 1_000_000, 2)
+            if amount_usdt <= 0:
+                continue
+            _set_balance(user, _balance(user) + amount_usdt)
+            db.add(TonTransaction(tx_hash=tx_hash, user_id=uid, amount=amount_usdt, comment=comment))
+            db.commit()
+            return {"confirmed": True, "amount": amount_usdt, "balance": _balance(user)}
         return {"confirmed": False}
     except Exception as e:
         return {"confirmed": False, "error": str(e)}
