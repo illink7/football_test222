@@ -54,6 +54,8 @@ class Game(Base):
     rounds_total = Column(Integer, default=10)
     current_round = Column(Integer, default=1)
     status = Column(String(32), default="active")  # e.g. active, finished
+    # Для Бундесліги: тур BL1, з якого починається гра (game round 1 = start_matchday)
+    start_matchday = Column(Integer, nullable=True)
 
     entries = relationship("Entry", back_populates="game", lazy="selectin")
     matches = relationship("Match", back_populates="game", lazy="selectin")
@@ -117,6 +119,9 @@ class Match(Base):
     away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
     home_goals = Column(Integer, nullable=True)  # filled after round simulation
     away_goals = Column(Integer, nullable=True)
+    utc_date = Column(DateTime, nullable=True)   # kickoff UTC (deadline для ставок = мін по туру)
+    external_id = Column(String(32), nullable=True)  # football-data.org match id
+    status = Column(String(32), nullable=True)   # SCHEDULED, FINISHED, etc.
 
     game = relationship("Game", back_populates="matches")
     home_team = relationship("Team", foreign_keys=[home_team_id])

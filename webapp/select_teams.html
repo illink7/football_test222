@@ -191,6 +191,8 @@
     .ticket-result .team-not-scored { color: var(--accent); font-size: 0.9rem; margin-top: 6px; }
     .ticket-result .stake-after { font-size: 0.85rem; opacity: 0.9; }
     .section-label { font-size: 0.85rem; font-weight: 600; color: var(--gold-light); margin: 16px 0 8px; }
+    .deadline-line { font-size: 0.85rem; margin-top: 8px; color: var(--gold-light); }
+    .deadline-line.past { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -199,6 +201,7 @@
       <h1>Выбрать команды</h1>
       <div class="round-badge" id="roundInfo">Тур —</div>
       <p class="stake-line" id="stakeLine" style="display:none;">Ваша ставка: <span id="stakeValue">—</span> USDT <span class="muted">(×1.5 после каждого тура)</span></p>
+      <p class="deadline-line" id="deadlineLine" style="display:none;"></p>
     </header>
 
     <p class="intro" id="intro">Выберите для каждого билета по две команды, которые забьют. В следующих турах для этого билета нельзя выбирать уже использованные команды.</p>
@@ -256,14 +259,54 @@
   }
 
   let roundData = null;
+  let roundInfo = null;
   let currentTicketIndex = null;
   let teamsData = [];
   let selectedIds = [];
+  let deadlineTick = null;
+
+  async function loadRoundInfo() {
+    const r = await fetch(baseUrl + '/api/entry/' + entryId + '/round_info');
+    if (!r.ok) return null;
+    return r.json();
+  }
 
   async function loadTeamsForRound() {
     const r = await fetch(baseUrl + '/api/entry/' + entryId + '/teams_for_round');
     if (!r.ok) throw new Error('Не удалось загрузить список команд');
     return r.json();
+  }
+
+  function formatDeadlineCountdown(deadlineUtc) {
+    if (!deadlineUtc) return null;
+    var d;
+    try { d = new Date(deadlineUtc); } catch (e) { return null; }
+    var now = new Date();
+    if (now >= d) return { past: true, text: 'Дедлайн ставок минув' };
+    var sec = Math.floor((d - now) / 1000);
+    var m = Math.floor(sec / 60); sec = sec % 60;
+    var h = Math.floor(m / 60); m = m % 60;
+    var day = Math.floor(h / 24); h = h % 24;
+    if (day > 0) return { past: false, text: 'До дедлайну: ' + day + ' д ' + h + ' год ' + m + ' хв' };
+    if (h > 0) return { past: false, text: 'До дедлайну: ' + h + ' год ' + m + ' хв' };
+    return { past: false, text: 'До дедлайну: ' + m + ' хв ' + sec + ' с' };
+  }
+
+  function updateDeadlineUI() {
+    var line = document.getElementById('deadlineLine');
+    if (!line || !roundInfo) return;
+    if (!roundInfo.deadline_utc) {
+      line.style.display = 'none';
+      return;
+    }
+    line.style.display = 'block';
+    var c = formatDeadlineCountdown(roundInfo.deadline_utc);
+    if (c) {
+      line.textContent = c.text;
+      line.classList.toggle('past', c.past);
+    } else {
+      line.textContent = 'Дедлайн: ' + roundInfo.deadline_utc.slice(0, 16).replace('T', ' ');
+    }
   }
 
   function toggleTeamSelection(teamId, usedSet) {
@@ -284,7 +327,8 @@
       if (row) { row.classList.add('selected'); var c = row.querySelector('.check'); if (c) c.textContent = '✓'; }
     });
     counterEl.textContent = 'Выбрано: ' + selectedIds.length + ' из 2';
-    submitBtn.disabled = selectedIds.length !== 2;
+    var canSubmit = selectedIds.length === 2 && (!roundInfo || roundInfo.can_bet);
+    submitBtn.disabled = !canSubmit;
   }
 
   function startPickForTicket(ticketIndex) {
@@ -347,6 +391,14 @@
       counterEl.textContent = 'Выбрано: 0 из 2';
       submitBtn.style.display = 'block';
       submitBtn.disabled = true;
+      if (roundInfo && !roundInfo.can_bet) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Дедлайн минув';
+        var msg = contentEl.querySelector('.info');
+        if (msg) msg.textContent = 'Дедлайн ставок по этому туру минув. Ставки больше не принимаются.';
+      } else {
+        submitBtn.textContent = 'Подтвердить выбор';
+      }
       contentEl.querySelectorAll('.team-btn').forEach(function (btn) {
         btn.addEventListener('click', function (e) { e.preventDefault(); toggleTeamSelection(parseInt(btn.dataset.teamId, 10), usedSet); });
       });
@@ -572,7 +624,15 @@
 
   (async function init() {
     try {
-      var data = await loadTeamsForRound();
+      var dataPromise = loadTeamsForRound();
+      var roundInfoPromise = loadRoundInfo();
+      var data = await dataPromise;
+      roundInfo = await roundInfoPromise;
+      updateDeadlineUI();
+      if (roundInfo && roundInfo.deadline_utc) {
+        if (deadlineTick) clearInterval(deadlineTick);
+        deadlineTick = setInterval(updateDeadlineUI, 1000);
+      }
       var hasData = (data.teams && data.teams.length > 0) || (data.matches && data.matches.length > 0);
       if (hasData) {
         renderTeamList(data);

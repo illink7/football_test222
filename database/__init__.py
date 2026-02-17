@@ -112,6 +112,30 @@ def _ensure_selections_ticket_index():
             conn.commit()
 
 
+def _ensure_game_start_matchday():
+    """Add games.start_matchday for Bundesliga (start BL1 matchday)."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('games') WHERE name='start_matchday'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE games ADD COLUMN start_matchday INTEGER"))
+            conn.commit()
+
+
+def _ensure_match_utc_date_and_external():
+    """Add matches.utc_date, external_id, status for Football-Data.org."""
+    if "sqlite" not in DATABASE_URL:
+        return
+    with engine.connect() as conn:
+        r = conn.execute(text("SELECT 1 FROM pragma_table_info('matches') WHERE name='utc_date'"))
+        if r.scalar() is None:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN utc_date DATETIME"))
+            conn.execute(text("ALTER TABLE matches ADD COLUMN external_id VARCHAR(32)"))
+            conn.execute(text("ALTER TABLE matches ADD COLUMN status VARCHAR(32)"))
+            conn.commit()
+
+
 def _ensure_tickets_backfill():
     """Для записів без білетів створити один білет (зворотна сумісність)."""
     if "sqlite" not in DATABASE_URL:
@@ -150,6 +174,8 @@ def init_db():
     _ensure_users_ton_wallet_column()
     _ensure_users_balance_usdt_column()
     _ensure_selections_ticket_index()
+    _ensure_game_start_matchday()
+    _ensure_match_utc_date_and_external()
     _ensure_tickets_backfill()
 
 

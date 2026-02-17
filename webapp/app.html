@@ -440,9 +440,23 @@
       <section class="section">
         <h2 class="section-title">🇩🇪 Бундеслига (BL1)</h2>
         <div class="card">
-          <p class="hint">Подтянуть текущий тур из <a href="https://www.football-data.org/" target="_blank" rel="noopener">Football-Data.org</a>. Нужен API ключ (FOOTBALL_DATA_API_KEY). Создастся или обновится игра «Bundesliga» и матчи текущего тура.</p>
+          <p class="hint" id="bl1InfoHint">Завантаження інформації про поточний тур...</p>
+          <div class="form-row" id="bl1FormRow" style="display:none;">
+            <label class="field-label">Кількість турів (максимум: <span id="bl1MaxRounds">—</span>)</label>
+            <input type="number" id="bl1RoundsCount" min="1" max="34" value="5" placeholder="5" />
+            <p class="hint" style="margin-top:8px;">Гра почнеться з тура <strong id="bl1CurrentMatchday">—</strong>. Дедлайн ставок = початок першого матчу тура.</p>
+          </div>
+          <p id="createBl1Error" class="hint error-inline" style="display:none;"></p>
+          <button type="button" id="btnCreateBundesligaGame" class="btn btn-success" style="display:none;">Створити гру Бундесліги</button>
+        </div>
+        <div class="card">
+          <p class="hint">Синхронизировать текущий тур с API: обновить счёты; если все матчи завершены — применить результаты и перейти к следующему туру.</p>
+          <button type="button" id="btnSyncBundesligaRound" class="btn btn-primary">Синхронизировать текущий тур</button>
+        </div>
+        <div class="card">
+          <p class="hint">Подтянуть один текущий тур (без дедлайнов): создаётся/обновляется игра «Bundesliga» и матчи одного тура.</p>
           <p id="fetchBl1Error" class="hint error-inline" style="display:none;"></p>
-          <button type="button" id="btnFetchBundesliga" class="btn btn-primary">Подтянуть тур Бундеслиги</button>
+          <button type="button" id="btnFetchBundesliga" class="btn btn-secondary">Подтянуть тур Бундеслиги</button>
         </div>
       </section>
 
@@ -764,9 +778,12 @@
         document.getElementById('setTeamsText').value = LEAGUE_LALIGA.join('\n');
         notify('Вставлено 20 команд Ла Лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
+      document.getElementById('btnCreateBundesligaGame').onclick = createBundesligaGame;
+      document.getElementById('btnSyncBundesligaRound').onclick = syncBundesligaRound;
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
       var btnAdminConfirm = document.getElementById('btnAdminConfirmDeposit');
       if (btnAdminConfirm) btnAdminConfirm.onclick = adminConfirmDeposit;
+      loadBundesligaInfo();
     } else {
       const balance = me.balance != null ? Number(me.balance) : 0;
       const betsBalanceEl = document.getElementById('betsBalanceValue');
@@ -1150,6 +1167,88 @@
     } catch (e) {
       errEl.textContent = e.message;
       errEl.style.display = 'block';
+      notify(e.message);
+    }
+  }
+
+  async function loadBundesligaInfo() {
+    const hintEl = document.getElementById('bl1InfoHint');
+    const formRowEl = document.getElementById('bl1FormRow');
+    const btnEl = document.getElementById('btnCreateBundesligaGame');
+    const maxRoundsEl = document.getElementById('bl1MaxRounds');
+    const currentMatchdayEl = document.getElementById('bl1CurrentMatchday');
+    const roundsCountInput = document.getElementById('bl1RoundsCount');
+    try {
+      const r = await fetch(baseUrl + '/api/admin/bundesliga_info', { headers: authHeaders() });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (hintEl) hintEl.textContent = data.detail || 'Помилка завантаження інформації про тур';
+        return;
+      }
+      const currentMatchday = data.current_matchday || 1;
+      const maxRounds = data.max_rounds || 1;
+      if (hintEl) hintEl.textContent = 'Створити гру на кілька турів Бундесліги. Команди підтягуються автоматично.';
+      if (formRowEl) formRowEl.style.display = 'block';
+      if (btnEl) btnEl.style.display = 'block';
+      if (maxRoundsEl) maxRoundsEl.textContent = maxRounds;
+      if (currentMatchdayEl) currentMatchdayEl.textContent = currentMatchday;
+      if (roundsCountInput) {
+        roundsCountInput.max = maxRounds;
+        if (parseInt(roundsCountInput.value, 10) > maxRounds) {
+          roundsCountInput.value = maxRounds;
+        }
+      }
+    } catch (e) {
+      if (hintEl) hintEl.textContent = 'Помилка завантаження інформації про тур: ' + e.message;
+    }
+  }
+
+  async function createBundesligaGame() {
+    const errEl = document.getElementById('createBl1Error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    const roundsCount = parseInt(document.getElementById('bl1RoundsCount').value, 10);
+    const maxRounds = parseInt(document.getElementById('bl1MaxRounds').textContent, 10) || 34;
+    if (!roundsCount || roundsCount < 1 || roundsCount > maxRounds) {
+      if (errEl) { errEl.textContent = 'Кількість турів: 1–' + maxRounds; errEl.style.display = 'block'; }
+      notify('Кількість турів: 1–' + maxRounds);
+      return;
+    }
+    try {
+      const r = await fetch(baseUrl + '/api/admin/create_bundesliga_game', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ rounds_count: roundsCount })
+      });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (errEl) { errEl.textContent = data.detail || 'Помилка'; errEl.style.display = 'block'; }
+        notify(data.detail || 'Помилка');
+        return;
+      }
+      const startMatchday = data.start_matchday || 1;
+      notify('Гра створена: ' + (data.title || 'Bundesliga') + ', тури ' + startMatchday + '–' + (startMatchday + roundsCount - 1) + ', матчів: ' + (data.matches_count || 0));
+      loadMe();
+    } catch (e) {
+      if (errEl) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+      notify(e.message);
+    }
+  }
+
+  async function syncBundesligaRound() {
+    try {
+      const r = await fetch(baseUrl + '/api/admin/sync_bundesliga_round', { method: 'POST', headers: authHeaders() });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        notify(data.detail || 'Ошибка');
+        return;
+      }
+      if (data.round_finished) {
+        notify('Тур завершён, результаты применены. Текущий тур: ' + (data.current_round || '—'));
+      } else {
+        notify('Тур обновлён. Матчей обновлено: ' + (data.updated_count || 0));
+      }
+      loadMe();
+    } catch (e) {
       notify(e.message);
     }
   }

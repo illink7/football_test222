@@ -9,7 +9,7 @@ import urllib.parse
 import uuid
 import base64
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -135,6 +135,11 @@ class DepositBody(BaseModel):
 
 class WithdrawBody(BaseModel):
     amount: float
+
+
+class CreateBundesligaGameBody(BaseModel):
+    start_matchday: int | None = None  # з якого туру BL1 починається гра (напр. 24); якщо None — використовується поточний тур
+    rounds_count: int    # скільки турів грає (напр. 5 → тури 24–28)
 
 
 # ----- Auth: require valid Telegram initData -----
@@ -347,6 +352,32 @@ async def get_available_teams(
     return [TeamItem(id=t.id, name=t.name) for t in teams]
 
 
+def _round_deadline_utc(db, game_id: int, round_num: int):
+    """Дедлайн ставок для туру = мін. utc_date серед матчів туру (початок першого матчу)."""
+    rows = (
+        db.execute(
+            select(Match.utc_date).where(
+                Match.game_id == game_id,
+                Match.round == round_num,
+                Match.utc_date.isnot(None),
+            )
+        )
+        .scalars().all()
+    )
+    dates = [r[0] for r in rows if r[0]]
+    return min(dates) if dates else None
+
+
+def _can_bet_round(db, game_id: int, round_num: int) -> bool:
+    deadline = _round_deadline_utc(db, game_id, round_num)
+    if deadline is None:
+        return True
+    now = datetime.now(timezone.utc)
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return now < deadline
+
+
 @app.get("/api/entry/{entry_id}/round")
 async def get_current_round(entry_id: int, db=Depends(get_db)):
     """Return current round number for this entry's game (for display and submit)."""
@@ -357,6 +388,28 @@ async def get_current_round(entry_id: int, db=Depends(get_db)):
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     return {"entry_id": entry_id, "game_id": game.id, "current_round": game.current_round}
+
+
+@app.get("/api/entry/{entry_id}/round_info")
+async def get_round_info(entry_id: int, db=Depends(get_db)):
+    """Інформація про поточний тур: дедлайн ставок та чи можна ще ставити."""
+    entry = db.get(Entry, entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    game = db.get(Game, entry.game_id)
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    rnd = game.current_round
+    deadline = _round_deadline_utc(db, game.id, rnd)
+    can_bet = _can_bet_round(db, game.id, rnd)
+    return {
+        "entry_id": entry_id,
+        "game_id": game.id,
+        "current_round": rnd,
+        "rounds_total": game.rounds_total,
+        "deadline_utc": deadline.isoformat() if deadline else None,
+        "can_bet": can_bet,
+    }
 
 
 @app.post("/api/selection")
@@ -375,6 +428,8 @@ async def submit_selection(body: SelectionSubmit, db=Depends(get_db)):
     rnd = game.current_round
     if rnd > game.rounds_total:
         raise HTTPException(status_code=400, detail="Game has no more rounds")
+    if not _can_bet_round(db, game.id, rnd):
+        raise HTTPException(status_code=400, detail="Дедлайн ставок минув. Ставки по цьому туру більше не приймаються.")
 
     # Check team IDs exist and are not already used for this entry
     used_ids = {s.team1_id for s in entry.selections} | {s.team2_id for s in entry.selections}
@@ -449,6 +504,8 @@ async def submit_match_selections(entry_id: int, body: MatchSelectionSubmit, db=
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
+    if not _can_bet_round(db, game.id, rnd):
+        raise HTTPException(status_code=400, detail="Дедлайн ставок минув. Ставки по цьому туру більше не приймаються.")
     matches_this_round = (
         db.execute(select(Match).where(Match.game_id == game.id, Match.round == rnd))
         .scalars().all()
@@ -575,6 +632,8 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
     if not game or game.status != "active":
         raise HTTPException(status_code=400, detail="Game not active")
     rnd = game.current_round
+    if not _can_bet_round(db, game.id, rnd):
+        raise HTTPException(status_code=400, detail="Дедлайн ставок минув. Ставки по цьому туру більше не приймаються.")
     ticket_index = max(1, body.ticket_index or 1)
     ticket = db.execute(
         select(Ticket).where(Ticket.entry_id == entry_id, Ticket.ticket_index == ticket_index)
@@ -626,6 +685,62 @@ async def submit_two_teams(entry_id: int, body: SubmitTwoTeams, db=Depends(get_d
 MIN_GOALS, MAX_GOALS = 0, 3
 
 
+def _apply_round_results(db, game, rnd: int) -> None:
+    """Застосувати результати туру: оновити білети/записи, збільшити game.current_round. У матчах мають бути вже заповнені home_goals/away_goals."""
+    matches = (
+        db.execute(
+            select(Match)
+            .where(Match.game_id == game.id, Match.round == rnd)
+            .order_by(Match.id)
+        )
+        .scalars().all()
+    )
+    if not matches or matches[0].home_goals is None:
+        return
+    scored_team_ids: set[int] = set()
+    for m in matches:
+        if (m.home_goals or 0) >= 1:
+            scored_team_ids.add(m.home_team_id)
+        if (m.away_goals or 0) >= 1:
+            scored_team_ids.add(m.away_team_id)
+    rows = (
+        db.execute(
+            select(Selection.entry_id, Selection.ticket_index, Selection.team1_id, Selection.team2_id).where(
+                Selection.round == rnd,
+            )
+        )
+        .all()
+    )
+    for row in rows:
+        eid, tidx, t1, t2 = row[0], row[1], row[2], row[3]
+        ticket = db.execute(
+            select(Ticket).where(Ticket.entry_id == eid, Ticket.ticket_index == tidx)
+        ).scalars().first()
+        if not ticket or ticket.status != "active":
+            continue
+        if t1 in scored_team_ids and t2 in scored_team_ids:
+            ticket.stake_amount = ticket.stake_amount * 1.5
+            e = db.get(Entry, eid)
+            if e and game.current_round >= 5:
+                _grant_achievement(db, e.user_id, "survived_5_rounds")
+        else:
+            ticket.status = "out"
+            e = db.get(Entry, eid)
+            if e:
+                _grant_achievement(db, e.user_id, "first_loss")
+                still_active = (
+                    db.execute(select(Ticket).where(Ticket.entry_id == eid, Ticket.status == "active"))
+                    .scalars().first()
+                )
+                if not still_active:
+                    e.status = "out"
+    game.current_round += 1
+    if game.current_round > game.rounds_total:
+        game.status = "finished"
+    db.commit()
+    db.refresh(game)
+
+
 @app.post("/api/entry/{entry_id}/run_round")
 async def run_round(entry_id: int, db=Depends(get_db)):
     """Симуляція туру: рахуємо білети всіх записів, повертаємо результат для цього entry."""
@@ -665,49 +780,10 @@ async def run_round(entry_id: int, db=Depends(get_db)):
         for m in matches:
             m.home_goals = random.randint(MIN_GOALS, MAX_GOALS)
             m.away_goals = random.randint(MIN_GOALS, MAX_GOALS)
-        scored_team_ids: set[int] = set()
-        for m in matches:
-            if (m.home_goals or 0) >= 1:
-                scored_team_ids.add(m.home_team_id)
-            if (m.away_goals or 0) >= 1:
-                scored_team_ids.add(m.away_team_id)
-        rows = (
-            db.execute(
-                select(Selection.entry_id, Selection.ticket_index, Selection.team1_id, Selection.team2_id).where(
-                    Selection.round == rnd,
-                )
-            )
-            .all()
-        )
-        for row in rows:
-            eid, tidx, t1, t2 = row[0], row[1], row[2], row[3]
-            ticket = db.execute(
-                select(Ticket).where(Ticket.entry_id == eid, Ticket.ticket_index == tidx)
-            ).scalars().first()
-            if not ticket or ticket.status != "active":
-                continue
-            if t1 in scored_team_ids and t2 in scored_team_ids:
-                ticket.stake_amount = ticket.stake_amount * 1.5
-                e = db.get(Entry, eid)
-                if e and game.current_round >= 5:
-                    _grant_achievement(db, e.user_id, "survived_5_rounds")
-            else:
-                ticket.status = "out"
-                e = db.get(Entry, eid)
-                if e:
-                    _grant_achievement(db, e.user_id, "first_loss")
-                    still_active = (
-                        db.execute(select(Ticket).where(Ticket.entry_id == eid, Ticket.status == "active"))
-                        .scalars().first()
-                    )
-                    if not still_active:
-                        e.status = "out"
-        game.current_round += 1
-        db.commit()
+        _apply_round_results(db, game, rnd)
         db.refresh(game)
-        if round_just_simulated:
-            for m in matches:
-                db.refresh(m)
+        for m in matches:
+            db.refresh(m)
     scored_team_ids = set()
     for m in matches:
         if (m.home_goals or 0) >= 1:
@@ -1175,9 +1251,256 @@ async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db
         return {"confirmed": False, "error": str(e)}
 
 
+def _fetch_bl1_matches_for_matchday(matchday: int):
+    headers = {"X-Auth-Token": FOOTBALL_DATA_API_KEY, "Accept": "application/json"}
+    req = urllib.request.Request(
+        f"https://api.football-data.org/v4/competitions/BL1/matches?matchday={matchday}",
+        headers=headers,
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode())
+    return data.get("matches") or []
+
+
+def _parse_utc_date(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _get_current_bundesliga_matchday():
+    """Визначити поточний тур Бундесліги: якщо поточний тур завершений (всі матчі FINISHED), повертає наступний тур."""
+    if not FOOTBALL_DATA_API_KEY:
+        return None
+    headers = {"X-Auth-Token": FOOTBALL_DATA_API_KEY, "Accept": "application/json"}
+    try:
+        req = urllib.request.Request(
+            "https://api.football-data.org/v4/competitions/BL1",
+            headers=headers,
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            comp = json.loads(resp.read().decode())
+        current = comp.get("currentSeason") or {}
+        matchday = current.get("currentMatchday")
+        if matchday is None or not isinstance(matchday, int) or matchday < 1:
+            matchday = 1
+        # Перевіряємо, чи всі матчі поточного туру завершені
+        try:
+            matches_data = _fetch_bl1_matches_for_matchday(matchday)
+            all_finished = True
+            if matches_data:
+                for m in matches_data:
+                    status = m.get("status")
+                    if status != "FINISHED":
+                        all_finished = False
+                        break
+                # Якщо всі матчі завершені, переходимо до наступного туру
+                if all_finished and matchday < 34:
+                    matchday += 1
+        except Exception:
+            pass  # Якщо не вдалося отримати матчі, повертаємо поточний тур
+        return matchday
+    except Exception:
+        return None
+
+
+@app.get("/api/admin/bundesliga_info")
+async def bundesliga_info(
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Отримати інформацію про поточний тур Бундесліги та максимальну кількість турів для створення гри."""
+    if not FOOTBALL_DATA_API_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Додайте FOOTBALL_DATA_API_KEY у змінні середовища.",
+        )
+    current_matchday = _get_current_bundesliga_matchday()
+    if current_matchday is None:
+        raise HTTPException(
+            status_code=502,
+            detail="Не вдалося визначити поточний тур Бундесліги.",
+        )
+    max_rounds = 34 - current_matchday + 1
+    return {
+        "ok": True,
+        "current_matchday": current_matchday,
+        "max_rounds": max_rounds,
+        "message": f"Поточний тур: {current_matchday}. Можна створити гру на максимум {max_rounds} турів (тури {current_matchday}–34).",
+    }
+
+
+@app.post("/api/admin/create_bundesliga_game")
+async def create_bundesliga_game(
+    body: CreateBundesligaGameBody,
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Створити гру Бундесліги: якщо start_matchday не вказано, використовується поточний тур. Менеджер обирає кількість турів."""
+    if not FOOTBALL_DATA_API_KEY:
+        raise HTTPException(
+            status_code=400,
+            detail="Додайте FOOTBALL_DATA_API_KEY у змінні середовища.",
+        )
+    # Якщо start_matchday не вказано, використовуємо поточний тур
+    if body.start_matchday is None:
+        start = _get_current_bundesliga_matchday()
+        if start is None:
+            raise HTTPException(
+                status_code=502,
+                detail="Не вдалося визначити поточний тур Бундесліги.",
+            )
+    else:
+        start = max(1, min(34, body.start_matchday))
+    count = max(1, min(34, body.rounds_count))
+    if start + count - 1 > 34:
+        raise HTTPException(
+            status_code=400,
+            detail=f"start_matchday ({start}) + rounds_count ({count}) не може перевищувати 34. Максимум турів: {34 - start + 1}.",
+        )
+    existing = db.execute(select(Game).where(Game.title == "Bundesliga", Game.start_matchday.isnot(None))).scalars().first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Гра Бундесліги з start_matchday вже існує. Створіть нову з іншою назвою або видаліть існуючу.",
+        )
+    game = Game(
+        title="Bundesliga",
+        rounds_total=count,
+        current_round=1,
+        status="active",
+        start_matchday=start,
+    )
+    db.add(game)
+    db.flush()
+    existing_teams = {t.name: t for t in db.execute(select(Team)).scalars().all()}
+
+    def get_or_create_team(name: str):
+        if not name:
+            return None
+        if name in existing_teams:
+            return existing_teams[name]
+        team = Team(name=name)
+        db.add(team)
+        db.flush()
+        existing_teams[name] = team
+        return team
+
+    total_matches = 0
+    for round_num in range(1, count + 1):
+        matchday = start + round_num - 1
+        try:
+            matches_data = _fetch_bl1_matches_for_matchday(matchday)
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=502, detail=f"Не вдалося отримати матчі туру {matchday}: {e}")
+        for m in matches_data:
+            home_name = (m.get("homeTeam") or {}).get("name") or (m.get("homeTeam") or {}).get("shortName") or ""
+            away_name = (m.get("awayTeam") or {}).get("name") or (m.get("awayTeam") or {}).get("shortName") or ""
+            if not home_name or not away_name:
+                continue
+            home_team = get_or_create_team(home_name)
+            away_team = get_or_create_team(away_name)
+            if not home_team or not away_team:
+                continue
+            score = (m.get("score") or {}).get("fullTime") or {}
+            hg, ag = score.get("home"), score.get("away")
+            db.add(
+                Match(
+                    game_id=game.id,
+                    round=round_num,
+                    home_team_id=home_team.id,
+                    away_team_id=away_team.id,
+                    home_goals=int(hg) if hg is not None else None,
+                    away_goals=int(ag) if ag is not None else None,
+                    utc_date=_parse_utc_date(m.get("utcDate")),
+                    external_id=str(m["id"]) if m.get("id") is not None else None,
+                    status=m.get("status"),
+                )
+            )
+            total_matches += 1
+    db.commit()
+    db.refresh(game)
+    return {
+        "ok": True,
+        "game_id": game.id,
+        "title": game.title,
+        "start_matchday": start,
+        "rounds_total": count,
+        "matches_count": total_matches,
+        "message": f"Гра створена: тури {start}–{start + count - 1} Бундесліги. Дедлайн ставок — початок першого матчу кожного туру.",
+    }
+
+
+@app.post("/api/admin/sync_bundesliga_round")
+async def sync_bundesliga_round(
+    game_id: int | None = Query(None),
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Синхронізувати поточний тур з Football-Data.org: оновити рахунки; якщо всі матчі завершені — застосувати результати туру і перейти до наступного."""
+    if not FOOTBALL_DATA_API_KEY:
+        raise HTTPException(status_code=400, detail="FOOTBALL_DATA_API_KEY не налаштовано.")
+    game = None
+    if game_id:
+        game = db.get(Game, game_id)
+    if not game:
+        game = db.execute(
+            select(Game).where(Game.title == "Bundesliga", Game.start_matchday.isnot(None))
+        ).scalars().first()
+    if not game or game.status != "active":
+        raise HTTPException(status_code=404, detail="Активну гру Бундесліги (зі start_matchday) не знайдено.")
+    rnd = game.current_round
+    if rnd > game.rounds_total:
+        return {"ok": True, "message": "Гра вже завершена.", "current_round": rnd}
+    start_matchday = game.start_matchday or rnd
+    matchday = start_matchday + rnd - 1
+    try:
+        matches_data = _fetch_bl1_matches_for_matchday(matchday)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Не вдалося отримати матчі: {e}")
+    our_matches = (
+        db.execute(select(Match).where(Match.game_id == game.id, Match.round == rnd))
+        .scalars().all()
+    )
+    ext_id_to_match = {m.external_id: m for m in our_matches if m.external_id}
+    all_finished = True
+    for m in matches_data:
+        ext_id = str(m.get("id")) if m.get("id") is not None else None
+        our = ext_id_to_match.get(ext_id) if ext_id else None
+        if not our:
+            continue
+        score = (m.get("score") or {}).get("fullTime") or {}
+        hg, ag = score.get("home"), score.get("away")
+        status_val = m.get("status")
+        if status_val != "FINISHED":
+            all_finished = False
+        our.home_goals = int(hg) if hg is not None else our.home_goals
+        our.away_goals = int(ag) if ag is not None else our.away_goals
+        our.status = status_val
+    db.commit()
+    if all_finished and our_matches:
+        _apply_round_results(db, game, rnd)
+        return {
+            "ok": True,
+            "message": f"Тур {rnd} завершено. Результати застосовано. Поточний тур: {game.current_round}.",
+            "current_round": game.current_round,
+            "round_finished": True,
+        }
+    return {
+        "ok": True,
+        "message": "Рахунки оновлено. Очікуйте завершення всіх матчів туру.",
+        "current_round": rnd,
+        "round_finished": False,
+    }
+
+
 @app.post("/api/admin/fetch_bundesliga_round")
 async def fetch_bundesliga_round(db=Depends(get_db), _admin: int = Depends(require_admin)):
-    """Підтягнути поточний тур Бундесліги з Football-Data.org: створити/оновити гру Bundesliga та матчі поточного туру."""
+    """Підтягнути поточний тур Бундесліги з Football-Data.org: створити/оновити гру Bundesliga та матчі поточного туру (без start_matchday — один тур)."""
     if not FOOTBALL_DATA_API_KEY:
         raise HTTPException(
             status_code=400,
@@ -1233,6 +1556,14 @@ async def fetch_bundesliga_round(db=Depends(get_db), _admin: int = Depends(requi
         db.execute(select(Match).where(Match.game_id == game.id, Match.round == matchday))
         .scalars().all()
     )
+    def parse_utc(s):
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
     for m in old_matches:
         db.delete(m)
     for m in matches_data:
@@ -1247,6 +1578,9 @@ async def fetch_bundesliga_round(db=Depends(get_db), _admin: int = Depends(requi
         score = (m.get("score") or {}).get("fullTime") or {}
         home_goals = score.get("home")
         away_goals = score.get("away")
+        ext_id = str(m.get("id")) if m.get("id") is not None else None
+        utc_d = parse_utc(m.get("utcDate"))
+        status_val = m.get("status")
         db.add(
             Match(
                 game_id=game.id,
@@ -1255,6 +1589,9 @@ async def fetch_bundesliga_round(db=Depends(get_db), _admin: int = Depends(requi
                 away_team_id=away_team.id,
                 home_goals=int(home_goals) if home_goals is not None else None,
                 away_goals=int(away_goals) if away_goals is not None else None,
+                utc_date=utc_d,
+                external_id=ext_id,
+                status=status_val,
             )
         )
     db.commit()
