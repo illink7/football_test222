@@ -1017,8 +1017,6 @@ async def deposit(body: DepositBody, uid: int = Depends(get_current_user), db=De
         db.flush()
     if getattr(user, "balance_usdt", None) is None:
         user.balance_usdt = 0.0
-    if not user.ton_wallet_address:
-        raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
     try:
         amount_float = round(float(body.amount), 2)
     except (ValueError, TypeError):
@@ -1135,9 +1133,7 @@ async def check_transaction(tx_id: str, uid: int = Depends(get_current_user), db
         db.flush()
     if getattr(user, "balance_usdt", None) is None:
         user.balance_usdt = 0.0
-    if not user.ton_wallet_address:
-        raise HTTPException(status_code=400, detail="Підключіть TON гаманець спочатку")
-    
+
     test_tx = db.execute(select(TonTransaction).where(TonTransaction.tx_hash == f"test_{tx_id}")).scalars().first()
     if test_tx:
         return {"confirmed": True, "amount": test_tx.amount, "balance": _balance(user)}

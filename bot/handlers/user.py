@@ -46,7 +46,8 @@ async def cmd_start(message: Message):
                 "Щоб веб-додаток був у меню бота (кнопка внизу чату): у @BotFather → твій бот → "
                 "Bot Settings → Menu Button → Configure → вкажи URL свого додатку (наприклад Railway).",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="Відкрити веб-додаток", web_app=WebAppInfo(url=WEBAPP_BASE_URL.rstrip("/")))]
+                    [InlineKeyboardButton(text="Відкрити веб-додаток", web_app=WebAppInfo(url=WEBAPP_BASE_URL.rstrip("/")))],
+                    [InlineKeyboardButton(text="Вывод средств", callback_data="withdraw_again")],
                 ]),
             )
             return

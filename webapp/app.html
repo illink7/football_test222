@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -41,10 +41,10 @@
       min-height: 100vh;
     }
     .font-title { font-family: 'Russo One', sans-serif; letter-spacing: 0.05em; }
-    .container { max-width: 420px; margin: 0 auto; padding: 20px 16px; }
+    .container { max-width: 420px; margin: 0 auto; padding: 16px 14px; }
     .header {
       text-align: center;
-      padding: 20px 0 24px;
+      padding: 14px 0 18px;
       border-bottom: 1px solid var(--card-border);
     }
     .header h1 { font-size: 1.5rem; margin: 0; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; text-shadow: 0 2px 8px rgba(255, 184, 77, 0.3); }
@@ -58,9 +58,9 @@
     .btn-rules-link:active { opacity: 0.9; }
     .loading { padding: 40px 24px; text-align: center; font-size: 1rem; opacity: 0.9; }
     .error { background: rgba(233,69,96,0.15); color: #e94560; padding: 16px; border-radius: 12px; margin: 16px; text-align: center; white-space: pre-line; }
-    .section {
-      margin: 24px 0;
-    }
+    .section { margin: 18px 0; }
+    .deposit-instruction-card { border-color: var(--gold); }
+    .deposit-instruction-text { font-size: 0.9rem; line-height: 1.5; margin: 0 0 14px; opacity: 0.95; }
     .section-title {
       font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
       color: var(--gold-light); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
@@ -68,10 +68,10 @@
     .card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 1px rgba(78, 205, 196, 0.1);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.3), 0 0 1px rgba(78, 205, 196, 0.15);
       backdrop-filter: blur(10px);
     }
     .card:last-child { margin-bottom: 0; }
@@ -116,8 +116,10 @@
     .error-inline { color: #e94560; opacity: 1; }
     .admin-only { display: none; }
     .user-only { display: none; }
+    .dev-only { display: none; }
     body.admin .admin-only { display: block; }
     body.user .user-only { display: block; }
+    body.dev .dev-only { display: block; }
     .entry-card {
       display: block;
       text-decoration: none;
@@ -384,30 +386,30 @@
     </div>
   </div>
 
-  <!-- Модалка выбора способа пополнения -->
+  <!-- Модалка пополнения (адрес + memo) -->
   <div id="depositChoiceModal" class="deposit-choice-overlay" style="display: none;">
     <div class="deposit-choice-card">
-      <h3 class="deposit-choice-title">Способ пополнения</h3>
-      <p class="deposit-choice-hint">Оберіть гаманець або перекажіть по адресі</p>
-      <div class="deposit-choice-btns">
+      <h3 class="deposit-choice-title">Пополнение баланса</h3>
+      <p class="deposit-choice-hint deposit-hint-main">Отправьте нужную сумму USDT в сети TON на указанный адрес. Обязательно укажите в комментарии к переводу этот memo — после перевода сумма зачислится на баланс автоматически.</p>
+      <div class="deposit-choice-btns dev-only" id="depositChoiceBtns">
         <button type="button" class="btn deposit-choice-btn" id="depositBtnTonkeeper">Tonkeeper</button>
         <button type="button" class="btn deposit-choice-btn" id="depositBtnTelegram">Telegram Wallet</button>
       </div>
       <div class="deposit-by-address">
-        <div class="deposit-by-address-title">По адресу (будь-який гаманець)</div>
+        <div class="deposit-by-address-title">Адрес и memo</div>
         <div class="deposit-by-address-row">
-          <label>Адреса:</label>
+          <label>Адрес:</label>
           <code id="depositModalAddress" class="deposit-addr"></code>
-          <button type="button" class="btn btn-small" id="depositCopyAddress">Копіювати</button>
+          <button type="button" class="btn btn-small" id="depositCopyAddress">Копировать</button>
         </div>
         <div class="deposit-by-address-row">
-          <label>Memo (коментар):</label>
+          <label>Memo (комментарий к переводу):</label>
           <code id="depositModalMemo" class="deposit-memo"></code>
-          <button type="button" class="btn btn-small" id="depositCopyMemo">Копіювати</button>
+          <button type="button" class="btn btn-small" id="depositCopyMemo">Копировать</button>
         </div>
-        <p class="deposit-by-address-note">Перекажіть USDT на адресу з цим memo — баланс підтвердиться автоматично.</p>
+        <p class="deposit-by-address-note">Переведите USDT на этот адрес с указанным memo — баланс обновится автоматически.</p>
       </div>
-      <button type="button" class="btn btn-secondary deposit-choice-cancel" id="depositChoiceCancel">Закрити</button>
+      <button type="button" class="btn btn-secondary deposit-choice-cancel" id="depositChoiceCancel">Закрыть</button>
     </div>
   </div>
 
@@ -565,7 +567,7 @@
             <div class="profile-balance-label">Ваш баланс</div>
             <div class="profile-balance-value" id="profileBalanceValue">— <span>USDT</span></div>
           </div>
-          <div class="card" id="walletCard">
+          <div class="card dev-only" id="walletCard">
             <div id="walletNotConnected">
               <p class="hint">Подключите TON кошелек для пополнения и вывода баланса</p>
               <button type="button" class="btn btn-primary" id="btnConnectWallet">🔗 Подключить TON кошелек</button>
@@ -575,9 +577,13 @@
               <button type="button" class="btn btn-secondary" id="btnDisconnectWallet">Отключить</button>
             </div>
           </div>
+          <div class="card deposit-instruction-card" id="depositByAddressCard" style="display:none;">
+            <p class="deposit-instruction-text">Отправьте нужную сумму USDT в сети TON на указанный адрес. Обязательно укажите в комментарии к переводу memo — после перевода сумма автоматически зачислится на ваш баланс.</p>
+            <button type="button" class="btn btn-success" id="btnAddBalanceProd">💵 Пополнить баланс</button>
+          </div>
           <div class="profile-actions">
-            <button type="button" class="btn btn-success" id="btnAddBalance">💵 Пополнить баланс</button>
-            <button type="button" class="btn btn-secondary" id="btnWithdraw">💸 Вывести баланс</button>
+            <button type="button" class="btn btn-success dev-only" id="btnAddBalance">💵 Пополнить баланс</button>
+            <button type="button" class="btn btn-secondary dev-only" id="btnWithdraw">💸 Вывести баланс</button>
           </div>
         </section>
         <section class="section">
@@ -596,6 +602,7 @@
 (function () {
   const tg = window.Telegram?.WebApp;
   if (tg) tg.ready();
+  const DEV_MODE = typeof window !== 'undefined' && (window.location.search.indexOf('dev=1') !== -1);
 
   const baseUrl = window.location.origin;
   let initData = (tg && tg.initData) ? tg.initData : '';
@@ -605,6 +612,10 @@
     const h = { ...extra };
     if (initData) h['X-Telegram-Init-Data'] = initData;
     return h;
+  }
+  function notify(msg) {
+    if (tg && tg.showAlert) tg.showAlert(msg);
+    else alert(msg);
   }
 
   const loadingEl = document.getElementById('loading');
@@ -711,7 +722,7 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        if (tg) tg.showAlert(data.detail || 'Помилка підключення гаманця');
+        notify(data.detail || 'Ошибка подключения кошелька');
       }
     } catch (e) {
       console.error('Connect wallet error:', e);
@@ -733,6 +744,11 @@
     loadingEl.style.display = 'none';
     errorEl.style.display = 'none';
     document.body.classList.add(me.is_admin ? 'admin' : 'user');
+    if (DEV_MODE) document.body.classList.add('dev');
+    var walletCard = document.getElementById('walletCard');
+    var depositByAddressCard = document.getElementById('depositByAddressCard');
+    if (walletCard) walletCard.style.display = DEV_MODE ? 'block' : 'none';
+    if (depositByAddressCard) depositByAddressCard.style.display = DEV_MODE ? 'none' : 'block';
 
     if (me.is_admin) {
       fillGamesSelects(me.games || []);
@@ -742,11 +758,11 @@
       document.getElementById('btnAddMatches').onclick = addMatches;
       document.getElementById('btnLeagueEPL').onclick = function () {
         document.getElementById('setTeamsText').value = LEAGUE_EPL.join('\n');
-        if (tg) tg.showAlert('Вставлено 20 команд Английской Премьер-лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
+        notify('Вставлено 20 команд Английской Премьер-лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
       document.getElementById('btnLeagueLaLiga').onclick = function () {
         document.getElementById('setTeamsText').value = LEAGUE_LALIGA.join('\n');
-        if (tg) tg.showAlert('Вставлено 20 команд Ла Лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
+        notify('Вставлено 20 команд Ла Лиги. Выберите игру и нажмите «Сгенерировать 10 туров».');
       };
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
       var btnAdminConfirm = document.getElementById('btnAdminConfirmDeposit');
@@ -771,44 +787,39 @@
       renderAchievements(me.achievements || []);
       document.getElementById('tabBets').onclick = function () { switchTab('bets'); };
       document.getElementById('tabProfile').onclick = function () { switchTab('profile'); };
-      initTonConnect();
-      if (me.ton_wallet_address) {
-        userWalletAddress = me.ton_wallet_address;
-        handleWalletConnected(me.ton_wallet_address);
+      if (DEV_MODE) {
+        initTonConnect();
+        if (me.ton_wallet_address) {
+          userWalletAddress = me.ton_wallet_address;
+          handleWalletConnected(me.ton_wallet_address);
+        }
+        document.getElementById('btnConnectWallet').onclick = function () {
+          if (tonConnectUI) tonConnectUI.openModal();
+          else notify('TON Connect не загружен. Перезагрузите страницу.');
+        };
+        document.getElementById('btnDisconnectWallet').onclick = function () {
+          if (tonConnectUI) tonConnectUI.disconnect();
+        };
+        document.getElementById('btnAddBalance').onclick = function () {
+          if (!userWalletAddress) { notify('Сначала подключите TON кошелёк'); return; }
+          showDepositDialog();
+        };
+        document.getElementById('btnWithdraw').onclick = function () {
+          if (!userWalletAddress) { notify('Сначала подключите TON кошелёк'); return; }
+          showWithdrawDialog();
+        };
+      } else {
+        var btnProd = document.getElementById('btnAddBalanceProd');
+        if (btnProd) btnProd.onclick = function () { showDepositDialog(); };
       }
-      document.getElementById('btnConnectWallet').onclick = function () {
-        if (tonConnectUI) {
-          tonConnectUI.openModal();
-        } else {
-          if (tg) tg.showAlert('TON Connect не загружен. Перезагрузите страницу.');
-        }
-      };
-      document.getElementById('btnDisconnectWallet').onclick = function () {
-        if (tonConnectUI) {
-          tonConnectUI.disconnect();
-        }
-      };
-      document.getElementById('btnAddBalance').onclick = function () {
-        if (!userWalletAddress) {
-          if (tg) tg.showAlert('Сначала подключите TON кошелек');
-          return;
-        }
-        showDepositDialog();
-      };
-      document.getElementById('btnWithdraw').onclick = function () {
-        if (!userWalletAddress) {
-          if (tg) tg.showAlert('Сначала подключите TON кошелек');
-          return;
-        }
-        showWithdrawDialog();
-      };
     }
   }
+
 
   function showDepositDialog() {
     var amount = prompt('Введите сумму пополнения (USDT):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-      if (tg) tg.showAlert('Введите корректную сумму');
+      notify('Введите корректную сумму');
       return;
     }
     requestDeposit(parseFloat(amount));
@@ -817,7 +828,7 @@
   function showWithdrawDialog() {
     var amount = prompt('Введите сумму вывода (USDT):');
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-      if (tg) tg.showAlert('Введите корректную сумму');
+      notify('Введите корректную сумму');
       return;
     }
     requestWithdraw(parseFloat(amount));
@@ -830,15 +841,12 @@
   function copyToClipboard(text, msg) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        if (tg) tg.showAlert(msg || 'Скопійовано');
-        else alert(msg || 'Скопійовано');
+        notify(msg || 'Скопировано');
       }).catch(function () {
-        if (tg) tg.showAlert('Скопіюйте вручну: ' + text.slice(0, 30) + '…');
-        else alert('Скопіюйте вручну: ' + text);
+        notify('Скопируйте вручную: ' + text.slice(0, 30) + '…');
       });
     } else {
-      if (tg) tg.showAlert('Скопіюйте вручну з блоку «По адресу» нижче');
-      else alert('Скопіюйте вручну: ' + text);
+      notify('Скопируйте вручную из блока «Адрес и memo» ниже');
     }
   }
   (function initDepositChoiceModal() {
@@ -859,7 +867,7 @@
       var d = window._depositLinks;
       if (!d) return;
       if (d.wallet) {
-        copyToClipboard(d.wallet, 'Адресу скопійовано. Відкрийте Wallet в Telegram → Переказ → вставте адресу. Memo скопіюйте кнопкою нижче.');
+        copyToClipboard(d.wallet, 'Адрес скопирован. Откройте Wallet в Telegram → Перевод → вставьте адрес. Memo скопируйте кнопкой ниже.');
       }
       if (d.tg) {
         try { openDepositLink(d.tg); } catch (e) {}
@@ -867,11 +875,11 @@
     });
     if (btnCopyAddr) btnCopyAddr.addEventListener('click', function () {
       var d = window._depositLinks;
-      if (d && d.wallet) copyToClipboard(d.wallet, 'Адресу скопійовано');
+      if (d && d.wallet) copyToClipboard(d.wallet, 'Адрес скопирован');
     });
     if (btnCopyMemo) btnCopyMemo.addEventListener('click', function () {
       var d = window._depositLinks;
-      if (d && d.comment) copyToClipboard(d.comment, 'Memo скопійовано');
+      if (d && d.comment) copyToClipboard(d.comment, 'Memo скопирован');
     });
     if (btnCancel) btnCancel.addEventListener('click', closeDepositModal);
   })();
@@ -885,16 +893,15 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        var msg = data.detail || 'Помилка';
-        if (msg.includes('не налаштовано')) {
-          msg = 'TON wallet не налаштовано на сервері. Зверніться до адміністратора.';
+        var msg = data.detail || 'Ошибка';
+        if (msg.indexOf('не налаштовано') !== -1 || msg.indexOf('не настроен') !== -1) {
+          msg = 'TON-кошелёк не настроен на сервере. Обратитесь к администратору.';
         }
-        if (tg) tg.showAlert(msg);
-        else alert(msg);
+        notify(msg);
         return;
       }
       if (data.test_mode) {
-        if (tg) tg.showAlert('Баланс пополнен (тестовый режим): +' + amount + ' USDT');
+        notify('Баланс пополнен (тестовый режим): +' + amount + ' USDT');
         await loadMe();
       } else if (data.payment_link) {
         var linkTk = data.payment_link;
@@ -909,14 +916,13 @@
         if (addrEl) addrEl.textContent = wallet;
         if (memoEl) memoEl.textContent = comment;
         if (modal) modal.style.display = 'flex';
-        if (tg) tg.showAlert('Оберіть спосіб поповнення. Після оплати баланс підтвердиться автоматично.');
+        notify('Выберите способ пополнения. После оплаты баланс обновится автоматически.');
         setTimeout(function () { checkTransactionStatus(txId); }, 5000);
       } else {
-        if (tg) tg.showAlert('Ошибка генерации ссылки');
+        notify('Ошибка генерации ссылки');
       }
     } catch (e) {
-      if (tg) tg.showAlert('Ошибка сети: ' + e.message);
-      else alert('Ошибка сети: ' + e.message);
+      notify('Ошибка сети: ' + e.message);
     }
   }
 
@@ -929,13 +935,13 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
-        if (tg) tg.showAlert(data.detail || 'Помилка');
+        notify(data.detail || 'Ошибка');
         return;
       }
-      if (tg) tg.showAlert('Запрос на вывод создан. Переведем после подтверждения.');
+      notify('Запрос на вывод создан. Переведём после подтверждения.');
       await loadMe();
     } catch (e) {
-      if (tg) tg.showAlert('Ошибка сети');
+      notify('Ошибка сети');
     }
   }
 
@@ -946,7 +952,7 @@
       });
       var data = await r.json().catch(function () { return {}; });
       if (data.confirmed) {
-        if (tg) tg.showAlert('Оплата подтверждена! Баланс пополнен.');
+        notify('Оплата подтверждена! Баланс пополнен.');
         await loadMe();
       } else {
         setTimeout(function () { checkTransactionStatus(txId); }, 5000);
@@ -1071,11 +1077,11 @@
     const stakeVal = stakeEl && stakeEl.value ? parseFloat(stakeEl.value) : null;
     const numTickets = numTicketsEl && numTicketsEl.value ? parseInt(numTicketsEl.value, 10) : 1;
     if (!gameId) {
-      if (tg) tg.showAlert('Выберите игру');
+      notify('Выберите игру');
       return;
     }
     if (!stakeVal || stakeVal < 0.1) {
-      if (tg) tg.showAlert('Выберите сумму ставки (мин. 0.1 USDT)');
+      notify('Выберите сумму ставки (мин. 0.1 USDT)');
       return;
     }
     try {
@@ -1086,25 +1092,25 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Ошибка');
-      if (tg) tg.showAlert('Вы присоединились к игре. Билетов: ' + (data.num_tickets || numTickets));
+      notify('Вы присоединились к игре. Билетов: ' + (data.num_tickets || numTickets));
       loadMe();
     } catch (e) {
-      if (tg) tg.showAlert(e.message);
+      notify(e.message);
     }
   }
 
   async function createGame() {
     const title = document.getElementById('newGameTitle').value.trim();
-    if (!title) { if (tg) tg.showAlert('Введите название игры'); return; }
+    if (!title) { notify('Введите название игры'); return; }
     try {
       const r = await fetch(baseUrl + '/api/games', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ title }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.detail || 'Ошибка');
-      if (tg) tg.showAlert('Игру создано: ' + data.title);
+      notify('Игру создано: ' + data.title);
       document.getElementById('newGameTitle').value = '';
       loadMe();
     } catch (e) {
-      if (tg) tg.showAlert(e.message);
+      notify(e.message);
     }
   }
 
@@ -1119,14 +1125,14 @@
     if (!gameId) {
       errEl.textContent = 'Выберите игру из списка выше.';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Выберите игру');
+      notify('Выберите игру');
       return;
     }
     const team_names = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (team_names.length !== 20) {
       errEl.textContent = 'Нужно ровно 20 команд (по одной на строку). Сейчас: ' + team_names.length;
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Введите ровно 20 названий команд');
+      notify('Введите ровно 20 названий команд');
       return;
     }
     try {
@@ -1137,14 +1143,14 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Ошибка');
-      if (tg) tg.showAlert('Сгенерировано 10 туров по 10 матчей. Старые матчи игры заменены.');
+      notify('Сгенерировано 10 туров по 10 матчей. Старые матчи игры заменены.');
       previewEl.style.display = 'block';
       previewEl.innerHTML = '<div class="preview-title">Готово: 10 туров, в каждом по 10 матчей (пары перемешаны для каждого тура).</div>';
       loadMe();
     } catch (e) {
       errEl.textContent = e.message;
       errEl.style.display = 'block';
-      if (tg) tg.showAlert(e.message);
+      notify(e.message);
     }
   }
 
@@ -1158,15 +1164,15 @@
       if (!r.ok) {
         errEl.textContent = data.detail || 'Ошибка';
         errEl.style.display = 'block';
-        if (tg) tg.showAlert(data.detail || 'Ошибка');
+        notify(data.detail || 'Ошибка');
         return;
       }
-      if (tg) tg.showAlert('Готово: ' + (data.title || 'Bundesliga') + ', тур ' + data.matchday + ', матчей: ' + (data.matches_count || 0));
+      notify('Готово: ' + (data.title || 'Bundesliga') + ', тур ' + data.matchday + ', матчей: ' + (data.matches_count || 0));
       loadMe();
     } catch (e) {
       errEl.textContent = e.message;
       errEl.style.display = 'block';
-      if (tg) tg.showAlert(e.message);
+      notify(e.message);
     }
   }
 
@@ -1182,17 +1188,17 @@
     const amount = amountEl ? parseFloat(amountEl.value) : NaN;
     if (!txId) {
       if (errEl) { errEl.textContent = 'Введите Transaction ID'; errEl.style.display = 'block'; }
-      if (tg) tg.showAlert('Введите Transaction ID');
+      notify('Введите Transaction ID');
       return;
     }
     if (!userId || isNaN(userId)) {
       if (errEl) { errEl.textContent = 'Введите Telegram ID пользователя'; errEl.style.display = 'block'; }
-      if (tg) tg.showAlert('Введите Telegram ID пользователя');
+      notify('Введите Telegram ID пользователя');
       return;
     }
     if (!amount || isNaN(amount) || amount < 0.1) {
       if (errEl) { errEl.textContent = 'Введите сумму не менее 0.1 USDT'; errEl.style.display = 'block'; }
-      if (tg) tg.showAlert('Введите сумму не менее 0.1 USDT');
+      notify('Введите сумму не менее 0.1 USDT');
       return;
     }
     try {
@@ -1203,16 +1209,16 @@
       const data = await r.json().catch(function () { return {}; });
       if (!r.ok) {
         if (errEl) { errEl.textContent = data.detail || 'Ошибка'; errEl.style.display = 'block'; }
-        if (tg) tg.showAlert(data.detail || 'Ошибка');
+        notify(data.detail || 'Ошибка');
         return;
       }
       if (okEl) { okEl.textContent = 'Зачислено ' + amount + ' USDT. Баланс пользователя: ' + (data.balance != null ? data.balance : '—'); okEl.style.display = 'block'; }
-      if (tg) tg.showAlert('Депозит подтверждён: +' + amount + ' USDT');
+      notify('Депозит подтверждён: +' + amount + ' USDT');
       document.getElementById('adminConfirmTxId').value = '';
       if (amountEl) amountEl.value = '';
     } catch (e) {
       if (errEl) { errEl.textContent = e.message || 'Ошибка сети'; errEl.style.display = 'block'; }
-      if (tg) tg.showAlert(e.message || 'Ошибка сети');
+      notify(e.message || 'Ошибка сети');
     }
   }
 
@@ -1226,7 +1232,7 @@
     if (!gameId) {
       errEl.textContent = 'Сначала выберите игру из списка выше.';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Выберите игру из списка «Выберите игру»');
+      notify('Выберите игру из списка «Выберите игру»');
       return;
     }
     if (!round || round < 1) {
@@ -1238,13 +1244,13 @@
     if (!lines.length) {
       errEl.textContent = 'Введите хотя бы один матч в формате: Дома — Гость (один на строку).';
       errEl.style.display = 'block';
-      if (tg) tg.showAlert('Введите матчи в текстовое поле');
+      notify('Введите матчи в текстовое поле');
       return;
     }
     try {
       const r = await fetch(baseUrl + '/api/games/' + gameId + '/matches', { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ round, matches: lines }) });
       const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.detail || 'Помилка');
+      if (!r.ok) throw new Error(data.detail || 'Ошибка');
       const added = data.added || 0;
       const notFound = data.not_found || [];
       if (notFound.length > 0) {
@@ -1252,10 +1258,10 @@
         errEl.style.display = 'block';
       }
       if (added > 0) {
-        if (tg) tg.showAlert('Добавлено матчей: ' + added + (notFound.length ? '. Часть не добавилась — смотрите подсказку под кнопкой.' : ''));
+        notify('Добавлено матчей: ' + added + (notFound.length ? '. Часть не добавилась — смотрите подсказку под кнопкой.' : ''));
         document.getElementById('addMatchText').value = '';
       } else if (notFound.length === 0) {
-        if (tg) tg.showAlert('Ничего не добавлено. Проверьте формат: Дома — Гость на каждую строку.');
+        notify('Ничего не добавлено. Проверьте формат: Дома — Гость на каждую строку.');
       }
       loadMe();
       if (added > 0) {
@@ -1272,7 +1278,7 @@
         }
       }
     } catch (e) {
-      if (tg) tg.showAlert(e.message);
+      notify(e.message);
     }
   }
 

@@ -9,9 +9,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramConflictError
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
-from bot.handlers import admin, user
+from bot.handlers import admin, user, withdraw
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,9 +28,10 @@ async def run_bot():
         token=BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(admin.router)
     dp.include_router(user.router)
+    dp.include_router(withdraw.router)
     try:
         await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
     except TelegramConflictError as e:
