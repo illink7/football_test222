@@ -367,7 +367,11 @@
       const usedSet = ticket ? new Set((ticket.used_team_ids || []).map(Number)) : new Set();
       selectedIds = [];
       introEl.style.display = 'none';
-      let html = '<p class="info" style="margin-bottom:12px;">Билет ' + currentTicketIndex + ' — выберите две команды:</p>';
+      const roundText = roundInfo && roundInfo.current_round ? 'Тур ' + roundInfo.current_round + ', ' : '';
+      let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">';
+      html += '<p class="info" style="margin:0;">' + roundText + 'Билет ' + currentTicketIndex + ' — выберите две команды:</p>';
+      html += '<button type="button" class="btn btn-outline" id="btnCancelSelection" style="padding:6px 12px; font-size:0.9rem;">Вийти</button>';
+      html += '</div>';
       if (matches.length > 0) {
         html += matches.map(function (m) {
           var homeUsed = usedSet.has(m.home_id), awayUsed = usedSet.has(m.away_id);
@@ -408,6 +412,13 @@
           toggleTeamSelection(parseInt(row.dataset.teamId, 10), usedSet);
         });
       });
+      const cancelBtn = document.getElementById('btnCancelSelection');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+          currentTicketIndex = null;
+          renderMain(data);
+        });
+      }
       return;
     }
 

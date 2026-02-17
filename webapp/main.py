@@ -364,7 +364,7 @@ def _round_deadline_utc(db, game_id: int, round_num: int):
         )
         .scalars().all()
     )
-    dates = [r[0] for r in rows if r[0]]
+    dates = [r for r in rows if r]
     return min(dates) if dates else None
 
 
