@@ -507,6 +507,28 @@
       </section>
 
       <section class="section">
+        <h2 class="section-title">💰 Добавить баланс пользователю</h2>
+        <div class="card">
+          <p class="hint">Добавить USDT на баланс пользователя напрямую (для тестирования или бонусов).</p>
+          <div class="form-row">
+            <label class="field-label">Telegram ID пользователя</label>
+            <input type="number" id="adminAddBalanceUserId" placeholder="7717041708" />
+          </div>
+          <div class="form-row">
+            <label class="field-label">Сумма (USDT)</label>
+            <input type="number" id="adminAddBalanceAmount" placeholder="1000" step="0.01" min="0.01" />
+          </div>
+          <div class="form-row">
+            <label class="field-label">Комментарий (опционально)</label>
+            <input type="text" id="adminAddBalanceComment" placeholder="test_balance или бонус" />
+          </div>
+          <p id="adminAddBalanceError" class="hint error-inline" style="display:none;"></p>
+          <p id="adminAddBalanceSuccess" class="hint" style="display:none; color: var(--success);"></p>
+          <button type="button" id="btnAdminAddBalance" class="btn btn-success">Добавить баланс</button>
+        </div>
+      </section>
+
+      <section class="section">
         <h2 class="section-title">💰 Ручное подтверждение депозита USDT</h2>
         <div class="card">
           <p class="hint">Если игрок отправил USDT, но баланс не обновился автоматически — введите данные и подтвердите зачисление.</p>
@@ -781,6 +803,10 @@
       document.getElementById('btnCreateBundesligaGame').onclick = createBundesligaGame;
       document.getElementById('btnSyncBundesligaRound').onclick = syncBundesligaRound;
       document.getElementById('btnFetchBundesliga').onclick = fetchBundesligaRound;
+      var btnAdminAddBalance = document.getElementById('btnAdminAddBalance');
+      if (btnAdminAddBalance) btnAdminAddBalance.onclick = adminAddBalance;
+      var btnAdminAddBalance = document.getElementById('btnAdminAddBalance');
+      if (btnAdminAddBalance) btnAdminAddBalance.onclick = adminAddBalance;
       var btnAdminConfirm = document.getElementById('btnAdminConfirmDeposit');
       if (btnAdminConfirm) btnAdminConfirm.onclick = adminConfirmDeposit;
       loadBundesligaInfo();
@@ -1318,6 +1344,50 @@
     } catch (e) {
       if (errEl) { errEl.textContent = e.message || 'Ошибка сети'; errEl.style.display = 'block'; }
       notify(e.message || 'Ошибка сети');
+    }
+  }
+
+  async function adminAddBalance() {
+    const errEl = document.getElementById('adminAddBalanceError');
+    const okEl = document.getElementById('adminAddBalanceSuccess');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (okEl) { okEl.style.display = 'none'; okEl.textContent = ''; }
+    const userIdEl = document.getElementById('adminAddBalanceUserId');
+    const amountEl = document.getElementById('adminAddBalanceAmount');
+    const commentEl = document.getElementById('adminAddBalanceComment');
+    const userId = userIdEl ? parseInt(userIdEl.value, 10) : NaN;
+    const amount = amountEl ? parseFloat(amountEl.value) : NaN;
+    const comment = commentEl ? commentEl.value.trim() || 'admin_add_balance' : 'admin_add_balance';
+    if (!userId || isNaN(userId)) {
+      if (errEl) { errEl.textContent = 'Введите Telegram ID пользователя'; errEl.style.display = 'block'; }
+      notify('Введите Telegram ID пользователя');
+      return;
+    }
+    if (!amount || isNaN(amount) || amount <= 0) {
+      if (errEl) { errEl.textContent = 'Введите сумму больше 0 USDT'; errEl.style.display = 'block'; }
+      notify('Введите сумму больше 0 USDT');
+      return;
+    }
+    try {
+      const url = baseUrl + '/api/admin/add_balance?user_id=' + userId + '&amount=' + amount + (comment ? '&comment=' + encodeURIComponent(comment) : '');
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (errEl) { errEl.textContent = data.detail || 'Ошибка'; errEl.style.display = 'block'; }
+        notify(data.detail || 'Ошибка');
+        return;
+      }
+      const msg = 'Добавлено ' + amount + ' USDT. Старый баланс: ' + (data.old_balance != null ? data.old_balance : '—') + ', новый баланс: ' + (data.new_balance != null ? data.new_balance : '—');
+      if (okEl) { okEl.textContent = msg; okEl.style.display = 'block'; }
+      notify('Баланс добавлен: +' + amount + ' USDT');
+      if (amountEl) amountEl.value = '';
+      if (commentEl) commentEl.value = '';
+    } catch (e) {
+      if (errEl) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+      notify(e.message);
     }
   }
 

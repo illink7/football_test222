@@ -1185,6 +1185,32 @@ async def admin_confirm_deposit(
     return {"ok": True, "amount": amount, "balance": _balance(user)}
 
 
+@app.post("/api/admin/add_balance")
+async def admin_add_balance(
+    user_id: int = Query(...),
+    amount: float = Query(...),
+    comment: str = Query("admin_add_balance"),
+    db=Depends(get_db),
+    _admin: int = Depends(require_admin),
+):
+    """Адмін: додати баланс користувачу напряму (для тестування або бонусів)."""
+    user = db.get(User, user_id)
+    if not user:
+        # Створити користувача, якщо не існує
+        user = User(tg_id=user_id, balance=0, balance_usdt=0.0)
+        db.add(user)
+        db.flush()
+    if getattr(user, "balance_usdt", None) is None:
+        user.balance_usdt = 0.0
+    old_balance = _balance(user)
+    _set_balance(user, old_balance + amount)
+    import uuid
+    tx_id = f"admin_add_{uuid.uuid4().hex[:16]}"
+    db.add(TonTransaction(tx_hash=tx_id, user_id=user_id, amount=amount, comment=comment))
+    db.commit()
+    return {"ok": True, "amount": amount, "old_balance": old_balance, "new_balance": _balance(user)}
+
+
 def _decode_jetton_comment(forward_payload_b64: str) -> str:
     """Декодувати текст коментаря з forward_payload (base64)."""
     if not forward_payload_b64:
